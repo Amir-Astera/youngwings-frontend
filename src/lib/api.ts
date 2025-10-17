@@ -1,3 +1,4 @@
+import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
 import type { PostResponse } from "../types/post";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
@@ -139,4 +140,101 @@ export function sendPostDislike(postId: string): Promise<PostResponse | undefine
 
 export function clearPostReaction(postId: string): Promise<PostResponse | undefined> {
   return deleteReactionRequest(postId);
+}
+
+export async function fetchComments(
+  postId: string,
+  {
+    page = 1,
+    size = 20,
+    signal,
+  }: { page?: number; size?: number; signal?: AbortSignal } = {}
+): Promise<CommentListResponse> {
+  const response = await apiRequest(`/api/comment/action/${postId}/comments?page=${page}&size=${size}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить список комментариев");
+  }
+
+  const parsed = await parseJsonResponse<CommentListResponse>(response);
+
+  if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return parsed;
+}
+
+export async function createComment(
+  postId: string,
+  payload: CreateCommentRequest
+): Promise<CommentResponse | undefined> {
+  const response = await apiRequest(`/api/comment/action/${postId}/comments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось добавить комментарий");
+  }
+
+  return parseJsonResponse<CommentResponse>(response);
+}
+
+async function sendCommentReactionRequest(
+  commentId: string,
+  action: "like" | "dislike"
+): Promise<CommentResponse | undefined> {
+  const response = await apiRequest(`/api/comment/action/${commentId}/${action}`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось обновить реакцию на комментарий");
+  }
+
+  try {
+    return await parseJsonResponse<CommentResponse>(response);
+  } catch (error) {
+    return undefined;
+  }
+}
+
+async function deleteCommentReactionRequest(commentId: string): Promise<CommentResponse | undefined> {
+  const response = await apiRequest(`/api/comment/action/${commentId}/reaction`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось удалить реакцию на комментарий");
+  }
+
+  try {
+    return await parseJsonResponse<CommentResponse>(response);
+  } catch (error) {
+    return undefined;
+  }
+}
+
+export function sendCommentLike(commentId: string): Promise<CommentResponse | undefined> {
+  return sendCommentReactionRequest(commentId, "like");
+}
+
+export function sendCommentDislike(commentId: string): Promise<CommentResponse | undefined> {
+  return sendCommentReactionRequest(commentId, "dislike");
+}
+
+export function clearCommentReaction(commentId: string): Promise<CommentResponse | undefined> {
+  return deleteCommentReactionRequest(commentId);
 }

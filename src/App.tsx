@@ -139,14 +139,11 @@ export default function App() {
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPosts = useCallback(
     ({ signal, background }: { signal?: AbortSignal; background?: boolean } = {}) => {
-      if (background) {
-        setIsRefreshing(true);
-      } else {
+      if (!background) {
         setIsLoading(true);
         setError(null);
       }
@@ -164,25 +161,85 @@ export default function App() {
             return bTime - aTime;
           });
 
-          setPosts(normalizedPosts);
-          setCurrentPostData((previous) => {
-            if (!previous) {
-              return previous;
-            }
+          if (background) {
+            setError(null);
+          }
 
-            const updated = normalizedPosts.find((item) => item.id === previous.id);
+          if (background) {
+            setPosts((previous) => {
+              if (previous.length === 0) {
+                return normalizedPosts;
+              }
 
-            if (!updated) {
-              return previous;
-            }
+              const previousMap = new Map(previous.map((item) => [item.id, item]));
 
-            return {
-              ...previous,
-              ...updated,
-              raw: updated.raw ?? previous.raw,
-            };
-          });
-          setError(null);
+              const merged = previous.map((item) => {
+                const updated = normalizedPosts.find((candidate) => candidate.id === item.id);
+
+                if (!updated) {
+                  return item;
+                }
+
+                return {
+                  ...item,
+                  likes: updated.likes,
+                  dislikes: updated.dislikes,
+                  comments: updated.comments,
+                  views: updated.views,
+                  raw: updated.raw ?? item.raw,
+                };
+              });
+
+              for (const item of normalizedPosts) {
+                if (!previousMap.has(item.id)) {
+                  merged.push(item);
+                }
+              }
+
+              return merged;
+            });
+
+            setCurrentPostData((previous) => {
+              if (!previous) {
+                return previous;
+              }
+
+              const updated = normalizedPosts.find((item) => item.id === previous.id);
+
+              if (!updated) {
+                return previous;
+              }
+
+              return {
+                ...previous,
+                likes: updated.likes,
+                dislikes: updated.dislikes,
+                comments: updated.comments,
+                views: updated.views,
+                raw: updated.raw ?? previous.raw,
+              };
+            });
+          } else {
+            setPosts(normalizedPosts);
+            setCurrentPostData((previous) => {
+              if (!previous) {
+                return previous;
+              }
+
+              const updated = normalizedPosts.find((item) => item.id === previous.id);
+
+              if (!updated) {
+                return previous;
+              }
+
+              return {
+                ...previous,
+                ...updated,
+                raw: updated.raw ?? previous.raw,
+              };
+            });
+            setError(null);
+          }
         })
         .catch((caughtError: unknown) => {
           if (signal?.aborted) {
@@ -207,9 +264,7 @@ export default function App() {
             return;
           }
 
-          if (background) {
-            setIsRefreshing(false);
-          } else {
+          if (!background) {
             setIsLoading(false);
           }
         });
@@ -239,7 +294,7 @@ export default function App() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      if (!isLoading && !isRefreshing) {
+      if (!isLoading) {
         fetchPosts({ background: true });
       }
     }, 10000);
@@ -247,7 +302,7 @@ export default function App() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [fetchPosts, isLoading, isRefreshing]);
+  }, [fetchPosts, isLoading]);
 
   const handleViewPost = (postData?: PostSummary) => {
     if (!postData) {
@@ -270,7 +325,10 @@ export default function App() {
   };
 
   const handlePostMetricsUpdate = useCallback(
-    (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => {
+    (
+      postId: string,
+      metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
+    ) => {
       setPosts((previousPosts) =>
         previousPosts.map((item) => {
           if (item.id !== postId) {
@@ -283,6 +341,7 @@ export default function App() {
                 likeCount: metrics.likes ?? item.raw.likeCount,
                 dislikeCount: metrics.dislikes ?? item.raw.dislikeCount,
                 viewCount: metrics.views ?? item.raw.viewCount,
+                commentCount: metrics.comments ?? item.raw.commentCount,
               }
             : item.raw;
 
@@ -291,6 +350,7 @@ export default function App() {
             likes: metrics.likes ?? item.likes,
             dislikes: metrics.dislikes ?? item.dislikes,
             views: metrics.views ?? item.views,
+            comments: metrics.comments ?? item.comments,
             raw: updatedRaw,
           };
         })
@@ -307,6 +367,7 @@ export default function App() {
               likeCount: metrics.likes ?? previous.raw.likeCount,
               dislikeCount: metrics.dislikes ?? previous.raw.dislikeCount,
               viewCount: metrics.views ?? previous.raw.viewCount,
+              commentCount: metrics.comments ?? previous.raw.commentCount,
             }
           : previous.raw;
 
@@ -315,6 +376,7 @@ export default function App() {
           likes: metrics.likes ?? previous.likes,
           dislikes: metrics.dislikes ?? previous.dislikes,
           views: metrics.views ?? previous.views,
+          comments: metrics.comments ?? previous.comments,
           raw: updatedRaw,
         };
       });
@@ -370,12 +432,6 @@ export default function App() {
 
                   {posts.length > 0 && (
                     <>
-                      {isRefreshing && (
-                        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center text-sm text-muted-foreground">
-                          Обновляем ленту...
-                        </div>
-                      )}
-
                       <div className="space-y-3 sm:space-y-5">
                         {posts.map((item) => (
                           <NewsCard

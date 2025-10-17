@@ -25,7 +25,10 @@ interface NewsCardProps {
   views: number;
   isAd?: boolean;
   onViewPost?: () => void;
-  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
+  onPostUpdate?: (
+    postId: string,
+    metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
+  ) => void;
 }
 
 export function NewsCard({
@@ -306,7 +309,7 @@ export function NewsCard({
   // Format number to K format (1000 -> 1K)
   const formatNumber = (num: number): string => {
     if (num >= 1000) {
-      return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+      return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
     }
     return num.toString();
   };
