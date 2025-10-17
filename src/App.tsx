@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MobileMenu } from "./components/MobileMenu";
@@ -15,9 +15,10 @@ import { SubsectionPage } from "./components/SubsectionPage";
 import { PostPage } from "./components/PostPage";
 import { Toaster } from "./components/ui/sonner";
 import { Button } from "./components/ui/button";
-import { fetchAllPosts } from "./lib/api";
+import { createPostCountersEventSource, fetchAllPosts, fetchPostCounters } from "./lib/api";
 import { formatRelativeTime } from "./lib/dates";
-import type { PostResponse, PostSummary } from "./types/post";
+import { useVisiblePosts } from "./lib/useVisiblePosts";
+import type { PostCountersUpdate, PostResponse, PostSummary } from "./types/post";
 
 function extractPlainTextFromContent(content?: string): string {
   if (!content) {
@@ -134,6 +135,9 @@ function getSubsectionDescription(subsection: string): string {
   return subsectionDescriptions[subsection] || "Актуальные материалы по теме";
 }
 
+const POSTS_PAGE_SIZE = 20;
+const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000];
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [viewingPost, setViewingPost] = useState(false);
@@ -141,141 +145,163 @@ export default function App() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { register: registerPostVisibility, visibleIds: observedVisibleIds } = useVisiblePosts();
+  const [debouncedVisibleIds, setDebouncedVisibleIds] = useState<string[]>([]);
+
+  const sortedVisibleIds = useMemo(() => {
+    if (!posts.length || observedVisibleIds.length === 0) {
+      return [];
+    }
+
+    const visibleSet = new Set(observedVisibleIds);
+    return posts.filter((item) => visibleSet.has(item.id)).map((item) => item.id);
+  }, [observedVisibleIds, posts]);
+
+  const subscriptionCandidates = useMemo(() => {
+    if (viewingPost && currentPostData?.id) {
+      return [currentPostData.id];
+    }
+
+    if (
+      currentPage === "home" ||
+      currentPage.startsWith("subsection-") ||
+      currentPage.startsWith("topic-")
+    ) {
+      return sortedVisibleIds;
+    }
+
+    return [];
+  }, [currentPage, currentPostData, sortedVisibleIds, viewingPost]);
 
   const fetchPosts = useCallback(
-    ({ signal, background }: { signal?: AbortSignal; background?: boolean } = {}) => {
-      if (!background) {
-        setIsLoading(true);
-        setError(null);
-      }
+    async ({ signal }: { signal?: AbortSignal } = {}) => {
+      setIsLoading(true);
+      setError(null);
 
-      fetchAllPosts(signal)
-        .then((data) => {
+      try {
+        const aggregated: PostResponse[] = [];
+        let nextPage = 1;
+        let expectedTotal = Number.POSITIVE_INFINITY;
+
+        while (aggregated.length < expectedTotal) {
           if (signal?.aborted) {
             return;
           }
 
-          const normalizedPosts = data.map((item: PostResponse) => mapPostResponseToSummary(item));
-          normalizedPosts.sort((a, b) => {
-            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return bTime - aTime;
-          });
+          const response = await fetchAllPosts({ page: nextPage, size: POSTS_PAGE_SIZE, signal });
 
-          if (background) {
-            setError(null);
-          }
-
-          if (background) {
-            setPosts((previous) => {
-              if (previous.length === 0) {
-                return normalizedPosts;
-              }
-
-              const previousMap = new Map(previous.map((item) => [item.id, item]));
-
-              const merged = previous.map((item) => {
-                const updated = normalizedPosts.find((candidate) => candidate.id === item.id);
-
-                if (!updated) {
-                  return item;
-                }
-
-                return {
-                  ...item,
-                  likes: updated.likes,
-                  dislikes: updated.dislikes,
-                  comments: updated.comments,
-                  views: updated.views,
-                  raw: updated.raw ?? item.raw,
-                };
-              });
-
-              for (const item of normalizedPosts) {
-                if (!previousMap.has(item.id)) {
-                  merged.push(item);
-                }
-              }
-
-              return merged;
-            });
-
-            setCurrentPostData((previous) => {
-              if (!previous) {
-                return previous;
-              }
-
-              const updated = normalizedPosts.find((item) => item.id === previous.id);
-
-              if (!updated) {
-                return previous;
-              }
-
-              return {
-                ...previous,
-                likes: updated.likes,
-                dislikes: updated.dislikes,
-                comments: updated.comments,
-                views: updated.views,
-                raw: updated.raw ?? previous.raw,
-              };
-            });
-          } else {
-            setPosts(normalizedPosts);
-            setCurrentPostData((previous) => {
-              if (!previous) {
-                return previous;
-              }
-
-              const updated = normalizedPosts.find((item) => item.id === previous.id);
-
-              if (!updated) {
-                return previous;
-              }
-
-              return {
-                ...previous,
-                ...updated,
-                raw: updated.raw ?? previous.raw,
-              };
-            });
-            setError(null);
-          }
-        })
-        .catch((caughtError: unknown) => {
           if (signal?.aborted) {
             return;
           }
 
-          if (caughtError instanceof Error && caughtError.name === "AbortError") {
-            return;
+          const items = Array.isArray(response.items) ? response.items : [];
+          const pageSize = typeof response.size === "number" && response.size > 0 ? response.size : POSTS_PAGE_SIZE;
+
+          if (items.length === 0) {
+            break;
           }
 
-          if (!background) {
-            const message =
-              caughtError instanceof Error && caughtError.message
-                ? caughtError.message
-                : "Не удалось получить список публикаций";
+          aggregated.push(...items);
+          expectedTotal = typeof response.total === "number" && response.total >= 0 ? response.total : aggregated.length;
 
-            setError(message);
-          }
-        })
-        .finally(() => {
-          if (signal?.aborted) {
-            return;
+          if (aggregated.length >= expectedTotal || items.length < pageSize) {
+            break;
           }
 
-          if (!background) {
-            setIsLoading(false);
-          }
+          nextPage += 1;
+        }
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        const normalizedPosts = aggregated.map((item) => mapPostResponseToSummary(item));
+        normalizedPosts.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
         });
+
+        setPosts(normalizedPosts);
+        setCurrentPostData((previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          const updated = normalizedPosts.find((item) => item.id === previous.id);
+
+          if (!updated) {
+            return previous;
+          }
+
+          return {
+            ...previous,
+            ...updated,
+            raw: updated.raw ?? previous.raw,
+          };
+        });
+      } catch (caughtError: unknown) {
+        if (signal?.aborted) {
+          return;
+        }
+
+        if (caughtError instanceof Error && caughtError.name === "AbortError") {
+          return;
+        }
+
+        const message =
+          caughtError instanceof Error && caughtError.message
+            ? caughtError.message
+            : "Не удалось получить список публикаций";
+
+        setError(message);
+      } finally {
+        if (signal?.aborted) {
+          return;
+        }
+
+        setIsLoading(false);
+      }
     },
     []
   );
 
   useEffect(() => {
+    if (subscriptionCandidates.length === 0) {
+      setDebouncedVisibleIds((previous) => (previous.length === 0 ? previous : []));
+      return;
+    }
+
+    const uniqueIds = Array.from(new Set(subscriptionCandidates));
+
+    const updateState = () => {
+      setDebouncedVisibleIds((previous) => {
+        if (
+          previous.length === uniqueIds.length &&
+          previous.every((value, index) => value === uniqueIds[index])
+        ) {
+          return previous;
+        }
+
+        return uniqueIds;
+      });
+    };
+
+    if (typeof window === "undefined") {
+      updateState();
+      return;
+    }
+
+    const timeoutId = window.setTimeout(updateState, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [subscriptionCandidates]);
+
+  useEffect(() => {
     const controller = new AbortController();
-    fetchPosts({ signal: controller.signal });
+    void fetchPosts({ signal: controller.signal });
 
     return () => {
       controller.abort();
@@ -292,18 +318,6 @@ export default function App() {
     setViewingPost(false);
     setCurrentPostData(null);
   }, [currentPage]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      if (!isLoading) {
-        fetchPosts({ background: true });
-      }
-    }, 10000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [fetchPosts, isLoading]);
 
   const handleViewPost = (postData?: PostSummary) => {
     if (!postData) {
@@ -385,6 +399,162 @@ export default function App() {
     []
   );
 
+  const applyCountersUpdates = useCallback(
+    (payload?: PostCountersUpdate[] | PostCountersUpdate | null) => {
+      if (!payload) {
+        return;
+      }
+
+      const updates = Array.isArray(payload) ? payload : [payload];
+
+      for (const update of updates) {
+        if (!update || typeof update.id !== "string") {
+          continue;
+        }
+
+        handlePostMetricsUpdate(update.id, {
+          likes:
+            typeof update.likeCount === "number" && Number.isFinite(update.likeCount)
+              ? update.likeCount
+              : undefined,
+          dislikes:
+            typeof update.dislikeCount === "number" && Number.isFinite(update.dislikeCount)
+              ? update.dislikeCount
+              : undefined,
+          views:
+            typeof update.viewCount === "number" && Number.isFinite(update.viewCount)
+              ? update.viewCount
+              : undefined,
+          comments:
+            typeof update.commentCount === "number" && Number.isFinite(update.commentCount)
+              ? update.commentCount
+              : undefined,
+        });
+      }
+    },
+    [handlePostMetricsUpdate]
+  );
+
+  useEffect(() => {
+    if (debouncedVisibleIds.length === 0 || typeof window === "undefined") {
+      return;
+    }
+
+    const ids = Array.from(
+      new Set(
+        debouncedVisibleIds.filter((id) => typeof id === "string" && id.trim() !== ""),
+      ),
+    );
+
+    if (ids.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: number | null = null;
+    let attempt = 0;
+    const controller = new AbortController();
+
+    const cleanupEventSource = () => {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+    };
+
+    const clearReconnectTimeout = () => {
+      if (reconnectTimeout !== null) {
+        window.clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+    };
+
+    function scheduleReconnect() {
+      if (cancelled) {
+        return;
+      }
+
+      const delay = RECONNECT_DELAYS[Math.min(attempt, RECONNECT_DELAYS.length - 1)];
+      attempt = Math.min(attempt + 1, RECONNECT_DELAYS.length - 1);
+
+      clearReconnectTimeout();
+
+      reconnectTimeout = window.setTimeout(() => {
+        if (!cancelled) {
+          void startStream();
+        }
+      }, delay);
+    }
+
+    async function startStream() {
+      clearReconnectTimeout();
+      cleanupEventSource();
+
+      try {
+        const snapshot = await fetchPostCounters(ids, controller.signal);
+
+        if (!cancelled && !controller.signal.aborted) {
+          applyCountersUpdates(snapshot);
+        }
+      } catch (error) {
+        if (!(error instanceof Error && error.name === "AbortError")) {
+          console.warn("Не удалось получить счётчики публикаций", error);
+        }
+      }
+
+      if (cancelled || controller.signal.aborted) {
+        return;
+      }
+
+      try {
+        eventSource = createPostCountersEventSource(ids);
+      } catch (error) {
+        console.warn("Не удалось открыть подписку на счётчики", error);
+        scheduleReconnect();
+        return;
+      }
+
+      attempt = 0;
+
+      eventSource.onopen = () => {
+        attempt = 0;
+        clearReconnectTimeout();
+      };
+
+      eventSource.onmessage = (event) => {
+        if (!event.data) {
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(event.data) as PostCountersUpdate[] | PostCountersUpdate;
+          applyCountersUpdates(parsed);
+        } catch (error) {
+          console.warn("Не удалось обработать обновление счётчиков", error);
+        }
+      };
+
+      eventSource.onerror = () => {
+        if (cancelled) {
+          return;
+        }
+
+        cleanupEventSource();
+        scheduleReconnect();
+      };
+    }
+
+    void startStream();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      cleanupEventSource();
+      clearReconnectTimeout();
+    };
+  }, [applyCountersUpdates, debouncedVisibleIds]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopHeader />
@@ -440,6 +610,7 @@ export default function App() {
                             {...item}
                             onViewPost={() => handleViewPost(item)}
                             onPostUpdate={handlePostMetricsUpdate}
+                            visibilityObserver={registerPostVisibility}
                           />
                         ))}
                       </div>
@@ -494,6 +665,7 @@ export default function App() {
                     posts={posts.filter((item) => item.category === sectionTitle)}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
+                    registerVisibility={registerPostVisibility}
                   />
                 );
               })()}
@@ -542,6 +714,7 @@ export default function App() {
                     posts={posts}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
+                    registerVisibility={registerPostVisibility}
                   />
                 );
               })()}

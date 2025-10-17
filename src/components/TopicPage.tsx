@@ -5,7 +5,11 @@ interface TopicPageProps {
   topic: string;
   posts: PostSummary[];
   onViewPost?: (postData?: PostSummary) => void;
-  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
+  onPostUpdate?: (
+    postId: string,
+    metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
+  ) => void;
+  registerVisibility?: (element: HTMLElement | null, postId: string) => void;
 }
 
 function normaliseTopic(value: string) {
@@ -16,7 +20,7 @@ function normaliseTopic(value: string) {
     .trim();
 }
 
-export function TopicPage({ topic, posts, onViewPost, onPostUpdate }: TopicPageProps) {
+export function TopicPage({ topic, posts, onViewPost, onPostUpdate, registerVisibility }: TopicPageProps) {
   const topicName = topic.replace(/-/g, " ");
   const normalizedTopic = normaliseTopic(topicName);
 
@@ -47,6 +51,7 @@ export function TopicPage({ topic, posts, onViewPost, onPostUpdate }: TopicPageP
               {...post}
               onViewPost={() => onViewPost?.(post)}
               onPostUpdate={onPostUpdate}
+              visibilityObserver={registerVisibility}
             />
           ))
         ) : (

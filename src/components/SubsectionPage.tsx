@@ -6,10 +6,21 @@ interface SubsectionPageProps {
   description: string;
   posts: PostSummary[];
   onViewPost?: (postData?: PostSummary) => void;
-  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
+  onPostUpdate?: (
+    postId: string,
+    metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
+  ) => void;
+  registerVisibility?: (element: HTMLElement | null, postId: string) => void;
 }
 
-export function SubsectionPage({ title, description, posts, onViewPost, onPostUpdate }: SubsectionPageProps) {
+export function SubsectionPage({
+  title,
+  description,
+  posts,
+  onViewPost,
+  onPostUpdate,
+  registerVisibility,
+}: SubsectionPageProps) {
   const news = posts;
 
   return (
@@ -29,6 +40,7 @@ export function SubsectionPage({ title, description, posts, onViewPost, onPostUp
               {...item}
               onViewPost={() => onViewPost?.(item)}
               onPostUpdate={onPostUpdate}
+              visibilityObserver={registerVisibility}
             />
           ))
         ) : (
