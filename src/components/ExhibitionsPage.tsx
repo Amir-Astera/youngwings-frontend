@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 const exhibitions = [
   {

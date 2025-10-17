@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MobileMenu } from "./components/MobileMenu";
@@ -14,147 +14,108 @@ import { ContactsPage } from "./components/ContactsPage";
 import { SubsectionPage } from "./components/SubsectionPage";
 import { PostPage } from "./components/PostPage";
 import { Toaster } from "./components/ui/sonner";
+import { Button } from "./components/ui/button";
+import { fetchAllPosts } from "./lib/api";
+import { formatRelativeTime } from "./lib/dates";
+import type { PostResponse, PostSummary } from "./types/post";
 
-const newsItems = [
-  {
-    id: 1,
-    title: "Astana Hub объявила о запуске новой акселерационной программы для технологических стартапов",
-    excerpt:
-      "Международный технопарк IT-стартапов Astana Hub запускает масштабную программу поддержки для инновационных проектов в области искусственного интеллекта, блокчейна и финтеха. Программа рассчитана на 6 месяцев и предоставляет участникам доступ к менторам, инвесторам и партнерам.",
-    image: "https://images.unsplash.com/photo-1702047135360-e549c2e1f7df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0ZWNobm9sb2d5JTIwc3RhcnR1cHxlbnwxfHx8fDE3NjAxMjgzNTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    category: "Стартапы",
-    date: "2 часа назад",
-    likes: 342,
-    comments: 45,
-    views: 4200,
-  },
-  {
-    id: 2,
-    title: "Казахстанские стартапы привлекли $50 млн инвестиций в третьем квартале 2025 года",
-    excerpt:
-      "Согласно новым данным, объем венчурных инвестиций в казахстанские технологические компании достиг рекордных показателей. Основные средства были направлены в сферы EdTech, FinTech и HealthTech.",
-    category: "Инвестиции",
-    date: "4 часа назад",
-    likes: 256,
-    comments: 32,
-    views: 3100,
-  },
-  {
-    id: 3,
-    title: "ИИ-платформа из Казахстана выходит на международный рынок",
-    excerpt:
-      "Стартап, разрабатывающий решения на основе искусственного интеллекта для автоматизации бизнес-процессов, объявил о начале экспансии в страны Центральной Азии и СНГ после успешного раунда финансирования.",
-    image: "https://images.unsplash.com/photo-1697577418970-95d99b5a55cf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhcnRpZmljaWFsJTIwaW50ZWxsaWdlbmNlfGVufDF8fHx8MTc2MDA2ODM2OXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    category: "Технологии",
-    date: "6 часов назад",
-    likes: 189,
-    comments: 28,
-    views: 2800,
-  },
-  {
-    id: 4,
-    title: "Как удаленная работа меняет IT-индустрию Казахстана",
-    excerpt:
-      "Исследование показало, что более 70% IT-специалистов в Казахстане предпочитают гибридный формат работы. Компании адаптируются к новым реалиям и пересматривают подходы к управлению командами.",
-    image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2V8ZW58MXx8fHwxNzYwMTE3MTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    category: "Карьера",
-    date: "8 часов назад",
-    likes: 143,
-    comments: 56,
-    views: 1900,
-  },
-  {
-    id: 5,
-    title: "Новые возможности для разработчиков: обзор технологических трендов 2025",
-    excerpt:
-      "От нейросетей до квантовых вычислений - разбираем ключевые направления развития технологий, которые будут определять будущее IT-индустрии в ближайшие годы.",
-    category: "Технологии",
-    date: "12 часов назад",
-    likes: 298,
-    comments: 67,
-    views: 5600,
-  },
-  {
-    id: 6,
-    title: "Цифровая трансформация: кейсы успешного внедрения в казахстанском бизнесе",
-    excerpt:
-      "Как местные компании используют современные технологии для оптимизации процессов и повышения конкурентоспособности. Реальные примеры и результаты.",
-    image: "https://images.unsplash.com/photo-1644325349124-d1756b79dd42?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkaWdpdGFsJTIwdHJhbnNmb3JtYXRpb258ZW58MXx8fHwxNzYwMDMwMTQyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    category: "Бизнес",
-    date: "1 день назад",
-    likes: 176,
-    comments: 41,
-    views: 2300,
-  },
-  {
-    id: 7,
-    title: "Топ-10 навыков для IT-специалистов в 2025 году",
-    excerpt:
-      "Какие компетенции наиболее востребованы на рынке труда и как развивать их эффективно. Советы от экспертов индустрии и успешных профессионалов.",
-    category: "Карьера",
-    date: "1 день назад",
-    likes: 421,
-    comments: 89,
-    views: 8900,
-  },
-  {
-    id: 8,
-    title: "Блокчейн в государственном секторе: перспективы и вызовы",
-    excerpt:
-      "Анализ потенциала технологии распределенного реестра для улучшения государственных услуг и повышения прозрачности административных процессов.",
-    category: "Технологии",
-    date: "2 дня назад",
-    likes: 234,
-    comments: 52,
-    views: 3400,
-  },
-  {
-    id: 9,
-    title: "EdTech революция: как меняется образование в Казахстане",
-    excerpt:
-      "Обзор самых интересных образовательных платформ и инициатив, которые трансформируют традиционную систему обучения и делают знания более доступными.",
-    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbm5vdmF0aW9uJTIwdGVjaG5vbG9neXxlbnwxfHx8fDE3NjAwMzk2NDB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    category: "Образование",
-    date: "2 дня назад",
-    likes: 312,
-    comments: 74,
-    views: 4500,
-  },
-  {
-    id: 10,
-    title: "Кибербезопасность в эпоху облачных технологий",
-    excerpt:
-      "Новые вызовы и решения для защиты данных в облачной инфраструктуре. Экспертные рекомендации по обеспечению безопасности корпоративных систем.",
-    category: "Технологии",
-    date: "3 дня назад",
-    likes: 187,
-    comments: 34,
-    views: 2700,
-  },
-  {
-    id: 11,
-    title: "Зеленые технологии: как IT помогает решать экологические проблемы",
-    excerpt:
-      "Инновационные решения для снижения углеродного следа и оптимизации ресурсов с помощью современных технологий.",
-    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbm5vdmF0aW9uJTIwdGVjaG5vbG9neXxlbnwxfHx8fDE3NjAwMzk2NDB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    category: "Инновации",
-    date: "3 дня назад",
-    likes: 245,
-    comments: 41,
-    views: 3200,
-  },
-  {
-    id: 12,
-    title: "Метавселенная и будущее социальных взаимодействий",
-    excerpt:
-      "Как виртуальная реальность меняет способы общения, работы и развлечений. Перспективы развития метавселенной в ближайшие годы.",
-    category: "Технологии",
-    date: "4 дня назад",
-    likes: 356,
-    comments: 78,
-    views: 5100,
-  },
-];
+function extractPlainTextFromContent(content?: string): string {
+  if (!content) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    const pieces: string[] = [];
+
+    const walk = (node: unknown): void => {
+      if (!node) {
+        return;
+      }
+
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+
+      if (typeof node !== "object") {
+        return;
+      }
+
+      const typedNode = node as { type?: string; text?: string; content?: unknown };
+
+      if (typedNode.type === "text" && typeof typedNode.text === "string") {
+        pieces.push(typedNode.text);
+      }
+
+      if (typedNode.content) {
+        walk(typedNode.content);
+      }
+    };
+
+    walk(parsed);
+
+    return pieces.join(" ").replace(/\s+/g, " ").trim();
+  } catch {
+    return content.trim();
+  }
+}
+
+function getDisplayDate(createdAt?: string): string {
+  if (!createdAt) {
+    return "";
+  }
+
+  const relative = formatRelativeTime(createdAt);
+
+  if (relative) {
+    return relative;
+  }
+
+  const date = new Date(createdAt);
+
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  return "";
+}
+
+function mapPostResponseToSummary(post: PostResponse): PostSummary {
+  const title = (post.title ?? "").trim();
+  const excerptSource = (post.description ?? "").trim() || extractPlainTextFromContent(post.content);
+  const rawThumbnail = typeof post.thumbnail === "string" ? post.thumbnail.trim() : "";
+  const image =
+    rawThumbnail && !/^(нет\s+фотки?|string)$/i.test(rawThumbnail) ? rawThumbnail : undefined;
+  const category = (post.chapter ?? "").trim();
+  const topic = (post.topic ?? "").trim();
+  const author = (post.author ?? "").trim();
+
+  return {
+    id: post.id,
+    title,
+    excerpt: excerptSource,
+    image,
+    category: category || "Главная",
+    date: getDisplayDate(post.createdAt),
+    likes: typeof post.likeCount === "number" ? post.likeCount : 0,
+    dislikes: typeof post.dislikeCount === "number" ? post.dislikeCount : 0,
+    comments: typeof post.commentCount === "number" ? post.commentCount : 0,
+    views: typeof post.viewCount === "number" ? post.viewCount : 0,
+    author: author || undefined,
+    topic: topic || undefined,
+    content: post.content,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    raw: post,
+  };
+}
+
+
 
 const subsectionDescriptions: { [key: string]: string } = {
   "Бизнес и стартапы": "Новости стартап-экосистемы, истории успеха и советы для предпринимателей",
@@ -176,7 +137,150 @@ function getSubsectionDescription(subsection: string): string {
 export default function App() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [viewingPost, setViewingPost] = useState(false);
-  const [currentPostData, setCurrentPostData] = useState<any>(null);
+  const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
+  const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPosts = useCallback(
+    ({ signal, background }: { signal?: AbortSignal; background?: boolean } = {}) => {
+      if (!background) {
+        setIsLoading(true);
+        setError(null);
+      }
+
+      fetchAllPosts(signal)
+        .then((data) => {
+          if (signal?.aborted) {
+            return;
+          }
+
+          const normalizedPosts = data.map((item: PostResponse) => mapPostResponseToSummary(item));
+          normalizedPosts.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          if (background) {
+            setError(null);
+          }
+
+          if (background) {
+            setPosts((previous) => {
+              if (previous.length === 0) {
+                return normalizedPosts;
+              }
+
+              const previousMap = new Map(previous.map((item) => [item.id, item]));
+
+              const merged = previous.map((item) => {
+                const updated = normalizedPosts.find((candidate) => candidate.id === item.id);
+
+                if (!updated) {
+                  return item;
+                }
+
+                return {
+                  ...item,
+                  likes: updated.likes,
+                  dislikes: updated.dislikes,
+                  comments: updated.comments,
+                  views: updated.views,
+                  raw: updated.raw ?? item.raw,
+                };
+              });
+
+              for (const item of normalizedPosts) {
+                if (!previousMap.has(item.id)) {
+                  merged.push(item);
+                }
+              }
+
+              return merged;
+            });
+
+            setCurrentPostData((previous) => {
+              if (!previous) {
+                return previous;
+              }
+
+              const updated = normalizedPosts.find((item) => item.id === previous.id);
+
+              if (!updated) {
+                return previous;
+              }
+
+              return {
+                ...previous,
+                likes: updated.likes,
+                dislikes: updated.dislikes,
+                comments: updated.comments,
+                views: updated.views,
+                raw: updated.raw ?? previous.raw,
+              };
+            });
+          } else {
+            setPosts(normalizedPosts);
+            setCurrentPostData((previous) => {
+              if (!previous) {
+                return previous;
+              }
+
+              const updated = normalizedPosts.find((item) => item.id === previous.id);
+
+              if (!updated) {
+                return previous;
+              }
+
+              return {
+                ...previous,
+                ...updated,
+                raw: updated.raw ?? previous.raw,
+              };
+            });
+            setError(null);
+          }
+        })
+        .catch((caughtError: unknown) => {
+          if (signal?.aborted) {
+            return;
+          }
+
+          if (caughtError instanceof Error && caughtError.name === "AbortError") {
+            return;
+          }
+
+          if (!background) {
+            const message =
+              caughtError instanceof Error && caughtError.message
+                ? caughtError.message
+                : "Не удалось получить список публикаций";
+
+            setError(message);
+          }
+        })
+        .finally(() => {
+          if (signal?.aborted) {
+            return;
+          }
+
+          if (!background) {
+            setIsLoading(false);
+          }
+        });
+    },
+    []
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchPosts({ signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
+  }, [fetchPosts]);
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -189,7 +293,23 @@ export default function App() {
     setCurrentPostData(null);
   }, [currentPage]);
 
-  const handleViewPost = (postData?: any) => {
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (!isLoading) {
+        fetchPosts({ background: true });
+      }
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchPosts, isLoading]);
+
+  const handleViewPost = (postData?: PostSummary) => {
+    if (!postData) {
+      return;
+    }
+
     setCurrentPostData(postData);
     setViewingPost(true);
   };
@@ -198,6 +318,72 @@ export default function App() {
     setViewingPost(false);
     setCurrentPostData(null);
   };
+
+  const handleRetry = () => {
+    if (!isLoading) {
+      fetchPosts();
+    }
+  };
+
+  const handlePostMetricsUpdate = useCallback(
+    (
+      postId: string,
+      metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
+    ) => {
+      setPosts((previousPosts) =>
+        previousPosts.map((item) => {
+          if (item.id !== postId) {
+            return item;
+          }
+
+          const updatedRaw = item.raw
+            ? {
+                ...item.raw,
+                likeCount: metrics.likes ?? item.raw.likeCount,
+                dislikeCount: metrics.dislikes ?? item.raw.dislikeCount,
+                viewCount: metrics.views ?? item.raw.viewCount,
+                commentCount: metrics.comments ?? item.raw.commentCount,
+              }
+            : item.raw;
+
+          return {
+            ...item,
+            likes: metrics.likes ?? item.likes,
+            dislikes: metrics.dislikes ?? item.dislikes,
+            views: metrics.views ?? item.views,
+            comments: metrics.comments ?? item.comments,
+            raw: updatedRaw,
+          };
+        })
+      );
+
+      setCurrentPostData((previous) => {
+        if (!previous || previous.id !== postId) {
+          return previous;
+        }
+
+        const updatedRaw = previous.raw
+          ? {
+              ...previous.raw,
+              likeCount: metrics.likes ?? previous.raw.likeCount,
+              dislikeCount: metrics.dislikes ?? previous.raw.dislikeCount,
+              viewCount: metrics.views ?? previous.raw.viewCount,
+              commentCount: metrics.comments ?? previous.raw.commentCount,
+            }
+          : previous.raw;
+
+        return {
+          ...previous,
+          likes: metrics.likes ?? previous.likes,
+          dislikes: metrics.dislikes ?? previous.dislikes,
+          views: metrics.views ?? previous.views,
+          comments: metrics.comments ?? previous.comments,
+          raw: updatedRaw,
+        };
+      });
+    },
+    []
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -215,21 +401,55 @@ export default function App() {
             {/* Main Content */}
             <div className="min-h-[calc(100vh-10rem)]">
               {viewingPost && currentPage === "home" && (
-                <PostPage onBack={handleBackFromPost} postData={currentPostData} />
+                <PostPage
+                  onBack={handleBackFromPost}
+                  postData={currentPostData}
+                  onPostUpdate={handlePostMetricsUpdate}
+                />
               )}
               
               {!viewingPost && currentPage === "home" && (
                 <div className="space-y-3 sm:space-y-5 lg:pt-6 pt-1">
-                  <div className="space-y-3 sm:space-y-5">
-                    {newsItems.map((item) => (
-                      <NewsCard key={item.id} {...item} onViewPost={() => handleViewPost(item)} />
-                    ))}
-                  </div>
-                  
-                  {/* Infinite scroll indicator */}
-                  <div className="text-center py-8">
-                    <p className="text-sm text-muted-foreground">Загрузка новых публикаций...</p>
-                  </div>
+                  {isLoading && posts.length === 0 && (
+                    <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+                      <p className="text-muted-foreground">Загрузка публикаций...</p>
+                    </div>
+                  )}
+
+                  {error && posts.length === 0 && (
+                    <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-4">
+                      <p className="text-muted-foreground">{error}</p>
+                      <Button variant="outline" size="sm" onClick={handleRetry}>
+                        Повторить попытку
+                      </Button>
+                    </div>
+                  )}
+
+                  {!isLoading && !error && posts.length === 0 && (
+                    <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+                      <p className="text-muted-foreground">Публикации ещё не добавлены. Загляните позже!</p>
+                    </div>
+                  )}
+
+                  {posts.length > 0 && (
+                    <>
+                      <div className="space-y-3 sm:space-y-5">
+                        {posts.map((item) => (
+                          <NewsCard
+                            key={item.id}
+                            {...item}
+                            onViewPost={() => handleViewPost(item)}
+                            onPostUpdate={handlePostMetricsUpdate}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Infinite scroll indicator */}
+                      <div className="text-center py-8">
+                        <p className="text-sm text-muted-foreground">Загрузка новых публикаций...</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -241,28 +461,96 @@ export default function App() {
 
               {currentPage === "contacts" && <ContactsPage />}
 
-              {currentPage.startsWith("subsection-") && !viewingPost && (
-                <SubsectionPage
-                  title={currentPage.replace("subsection-", "")}
-                  description={getSubsectionDescription(currentPage.replace("subsection-", ""))}
-                  onViewPost={(postData) => handleViewPost(postData)}
-                />
-              )}
+              {currentPage.startsWith("subsection-") && !viewingPost && (() => {
+                const sectionTitle = currentPage.replace("subsection-", "");
+
+                if (isLoading && posts.length === 0) {
+                  return (
+                    <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
+                      <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+                        <p className="text-muted-foreground">Загрузка публикаций...</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (error && posts.length === 0) {
+                  return (
+                    <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
+                      <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-4">
+                        <p className="text-muted-foreground">{error}</p>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                          Повторить попытку
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <SubsectionPage
+                    title={sectionTitle}
+                    description={getSubsectionDescription(sectionTitle)}
+                    posts={posts.filter((item) => item.category === sectionTitle)}
+                    onViewPost={handleViewPost}
+                    onPostUpdate={handlePostMetricsUpdate}
+                  />
+                );
+              })()}
               
               {currentPage.startsWith("subsection-") && viewingPost && (
-                <PostPage onBack={handleBackFromPost} postData={currentPostData} />
+                <PostPage
+                  onBack={handleBackFromPost}
+                  postData={currentPostData}
+                  onPostUpdate={handlePostMetricsUpdate}
+                />
               )}
 
               {currentPage === "events" && <EventsPage />}
 
               {currentPage === "upcoming-events" && <UpcomingEventsPage onPageChange={setCurrentPage} />}
 
-              {currentPage.startsWith("topic-") && !viewingPost && (
-                <TopicPage topic={currentPage.replace("topic-", "")} onViewPost={(postData) => handleViewPost(postData)} />
-              )}
-              
+              {currentPage.startsWith("topic-") && !viewingPost && (() => {
+                const topicKey = currentPage.replace("topic-", "");
+
+                if (isLoading && posts.length === 0) {
+                  return (
+                    <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
+                      <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+                        <p className="text-muted-foreground">Загрузка публикаций...</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (error && posts.length === 0) {
+                  return (
+                    <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
+                      <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-4">
+                        <p className="text-muted-foreground">{error}</p>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                          Повторить попытку
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <TopicPage
+                    topic={topicKey}
+                    posts={posts}
+                    onViewPost={handleViewPost}
+                    onPostUpdate={handlePostMetricsUpdate}
+                  />
+                );
+              })()}
               {currentPage.startsWith("topic-") && viewingPost && (
-                <PostPage onBack={handleBackFromPost} postData={currentPostData} />
+                <PostPage
+                  onBack={handleBackFromPost}
+                  postData={currentPostData}
+                  onPostUpdate={handlePostMetricsUpdate}
+                />
               )}
             </div>
 

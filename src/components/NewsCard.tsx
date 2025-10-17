@@ -1,122 +1,697 @@
-import { useState } from "react";
-import { ThumbsUp, ThumbsDown, MessageCircle, Share2, Eye, ChevronDown, MessageSquare, Twitter, Facebook, Link2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Share2, Eye, Twitter, Facebook, Link2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Textarea } from "./ui/textarea";
+import { Input } from "./ui/input";
+import { Checkbox } from "./ui/checkbox";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { TipTapContent } from "./TipTapContent";
+import {
+  clearCommentReaction,
+  clearPostReaction,
+  createComment,
+  fetchComments,
+  registerPostView,
+  sendCommentDislike,
+  sendCommentLike,
+  sendPostDislike,
+  sendPostLike,
+} from "../lib/api";
+import { formatRelativeTime } from "../lib/dates";
+import { hasViewBeenRecorded, markViewRecorded } from "../lib/clientState";
+import type { PostResponse } from "../types/post";
+import type { CommentResponse } from "../types/comment";
 
 interface NewsCardProps {
-  id: number;
+  id: string;
   title: string;
   excerpt: string;
-  image?: string;
+  content?: string | null;
+  image?: string | null;
   category: string;
   date: string;
   likes: number;
+  dislikes: number;
   comments: number;
   views: number;
   isAd?: boolean;
-  onViewPost?: (postData?: any) => void;
+  onViewPost?: () => void;
+  onPostUpdate?: (
+    postId: string,
+    metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
+  ) => void;
 }
+
+function getCommentDisplayDate(createdAt?: string): string {
+  if (!createdAt) {
+    return "";
+  }
+
+  const relative = formatRelativeTime(createdAt);
+
+  if (relative) {
+    return relative;
+  }
+
+  const date = new Date(createdAt);
+
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return "";
+}
+
+function getCommentAuthor(name?: string | null): string {
+  return name?.trim() || "Аноним";
+}
+
+const COMMENTS_PAGE_SIZE = 20;
 
 export function NewsCard({
   id,
   title,
   excerpt,
+  content,
   image,
   category,
   date,
-  likes: initialLikes,
-  comments,
+  likes,
+  dislikes,
+  comments: initialComments,
   views,
   onViewPost,
+  onPostUpdate,
 }: NewsCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
-  const [likeCount, setLikeCount] = useState(initialLikes);
-  const [dislikeCount, setDislikeCount] = useState(Math.floor(initialLikes * 0.1));
+  const [likeCount, setLikeCount] = useState(likes);
+  const [dislikeCount, setDislikeCount] = useState(dislikes);
+  const [viewCount, setViewCount] = useState(views);
+  const [commentCount, setCommentCount] = useState(initialComments);
   const [showComments, setShowComments] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [newComment, setNewComment] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isReactionPending, setIsReactionPending] = useState(false);
+  const [isViewPending, setIsViewPending] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isCommentsLoading, setIsCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [commentsPage, setCommentsPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+  const [commentsList, setCommentsList] = useState<CommentResponse[]>([]);
+  const [commentReactions, setCommentReactions] = useState<Record<string, { liked: boolean; disliked: boolean }>>({});
+  const [reactionPendingByComment, setReactionPendingByComment] = useState<Record<string, boolean>>({});
+  const [hasRegisteredView, setHasRegisteredView] = useState(() => hasViewBeenRecorded(id));
+  const commentsAbortRef = useRef<AbortController | null>(null);
 
-  const [commentReactions, setCommentReactions] = useState<{[key: number]: {liked: boolean, disliked: boolean, likes: number, dislikes: number}}>({
-    1: { liked: false, disliked: false, likes: 12, dislikes: 2 },
-    2: { liked: false, disliked: false, likes: 8, dislikes: 1 },
-    3: { liked: false, disliked: false, likes: 15, dislikes: 3 },
-    4: { liked: false, disliked: false, likes: 6, dislikes: 0 },
-    5: { liked: false, disliked: false, likes: 9, dislikes: 1 },
-  });
+  const applyMetrics = useCallback(
+    (
+      response?: PostResponse | null,
+      fallback?: { likes?: number; dislikes?: number; views?: number; comments?: number }
+    ) => {
+      const metrics: { likes?: number; dislikes?: number; views?: number; comments?: number } = {};
 
-  const handleLike = () => {
-    if (isLiked) {
-      setLikeCount(likeCount - 1);
-      setIsLiked(false);
-    } else {
-      if (isDisliked) {
-        setDislikeCount(dislikeCount - 1);
-        setIsDisliked(false);
+      const sources = [
+        response
+          ? {
+              likes:
+                typeof response.likeCount === "number" && Number.isFinite(response.likeCount)
+                  ? response.likeCount
+                  : undefined,
+              dislikes:
+                typeof response.dislikeCount === "number" && Number.isFinite(response.dislikeCount)
+                  ? response.dislikeCount
+                  : undefined,
+              views:
+                typeof response.viewCount === "number" && Number.isFinite(response.viewCount)
+                  ? response.viewCount
+                  : undefined,
+              comments:
+                typeof response.commentCount === "number" && Number.isFinite(response.commentCount)
+                  ? response.commentCount
+                  : undefined,
+            }
+          : undefined,
+        fallback,
+      ];
+
+      for (const source of sources) {
+        if (!source) {
+          continue;
+        }
+
+        if (typeof source.likes === "number" && Number.isFinite(source.likes)) {
+          metrics.likes = source.likes;
+        }
+
+        if (typeof source.dislikes === "number" && Number.isFinite(source.dislikes)) {
+          metrics.dislikes = source.dislikes;
+        }
+
+        if (typeof source.views === "number" && Number.isFinite(source.views)) {
+          metrics.views = source.views;
+        }
+
+        if (typeof source.comments === "number" && Number.isFinite(source.comments)) {
+          metrics.comments = source.comments;
+        }
       }
-      setLikeCount(likeCount + 1);
-      setIsLiked(true);
-    }
-  };
 
-  const handleDislike = () => {
-    if (isDisliked) {
-      setDislikeCount(dislikeCount - 1);
-      setIsDisliked(false);
-    } else {
+      if (metrics.likes !== undefined) {
+        setLikeCount(metrics.likes);
+      }
+
+      if (metrics.dislikes !== undefined) {
+        setDislikeCount(metrics.dislikes);
+      }
+
+      if (metrics.views !== undefined) {
+        setViewCount(metrics.views);
+      }
+
+      if (metrics.comments !== undefined) {
+        setCommentCount(metrics.comments);
+      }
+
+      if (onPostUpdate && Object.keys(metrics).length > 0) {
+        onPostUpdate(id, metrics);
+      }
+
+      return metrics;
+    },
+    [id, onPostUpdate]
+  );
+
+  const handleLike = useCallback(async () => {
+    if (isReactionPending) {
+      return;
+    }
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
       if (isLiked) {
-        setLikeCount(likeCount - 1);
+        const nextLikes = Math.max(0, previous.likeCount - 1);
         setIsLiked(false);
+        setLikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(id);
+        applyMetrics(response, { likes: nextLikes, dislikes: previous.dislikeCount });
+      } else {
+        setIsLiked(true);
+        setLikeCount((value) => value + 1);
+
+        if (isDisliked) {
+          setIsDisliked(false);
+          setDislikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostLike(id);
+        const nextLikes = previous.likeCount + 1;
+        const nextDislikes = isDisliked ? Math.max(0, previous.dislikeCount - 1) : previous.dislikeCount;
+        applyMetrics(response, {
+          likes: nextLikes,
+          dislikes: nextDislikes,
+        });
       }
-      setDislikeCount(dislikeCount + 1);
-      setIsDisliked(true);
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
     }
-  };
+  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount]);
 
-  const handleCommentLike = (commentId: number) => {
-    setCommentReactions(prev => {
-      const current = prev[commentId];
-      const newState = { ...prev };
-      
-      if (current.liked) {
-        newState[commentId] = { ...current, liked: false, likes: current.likes - 1 };
+  const handleDislike = useCallback(async () => {
+    if (isReactionPending) {
+      return;
+    }
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isDisliked) {
+        const nextDislikes = Math.max(0, previous.dislikeCount - 1);
+        setIsDisliked(false);
+        setDislikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(id);
+        applyMetrics(response, { dislikes: nextDislikes, likes: previous.likeCount });
       } else {
-        if (current.disliked) {
-          newState[commentId] = { ...current, disliked: false, dislikes: current.dislikes - 1, liked: true, likes: current.likes + 1 };
+        setIsDisliked(true);
+        setDislikeCount((value) => value + 1);
+
+        if (isLiked) {
+          setIsLiked(false);
+          setLikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostDislike(id);
+        const nextDislikes = previous.dislikeCount + 1;
+        const nextLikes = isLiked ? Math.max(0, previous.likeCount - 1) : previous.likeCount;
+        applyMetrics(response, {
+          dislikes: nextDislikes,
+          likes: nextLikes,
+        });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount]);
+
+  const handleExpand = useCallback(() => {
+    setIsExpanded(true);
+
+    if (hasRegisteredView || isViewPending) {
+      return;
+    }
+
+    setIsViewPending(true);
+    const previous = viewCount;
+    setViewCount((value) => value + 1);
+
+    registerPostView(id)
+      .then((response) => {
+        markViewRecorded(id);
+        setHasRegisteredView(true);
+        applyMetrics(response, { views: previous + 1 });
+      })
+      .catch(() => {
+        setViewCount(previous);
+        toast.error("Не удалось отметить просмотр. Попробуйте ещё раз.");
+      })
+      .finally(() => {
+        setIsViewPending(false);
+      });
+  }, [applyMetrics, hasRegisteredView, id, isViewPending, viewCount]);
+
+  useEffect(() => {
+    setLikeCount(likes);
+  }, [likes]);
+
+  useEffect(() => {
+    setDislikeCount(dislikes);
+  }, [dislikes]);
+
+  useEffect(() => {
+    setViewCount(views);
+  }, [views]);
+
+  useEffect(() => {
+    setCommentCount(initialComments);
+  }, [initialComments]);
+
+  useEffect(() => {
+    setHasRegisteredView(hasViewBeenRecorded(id));
+    setShowComments(false);
+    setCommentsList([]);
+    setCommentReactions({});
+    setReactionPendingByComment({});
+    setCommentsPage(1);
+    setHasMoreComments(false);
+    setCommentsError(null);
+    setNewComment("");
+    setFirstName("");
+    setLastName("");
+    setIsAnonymous(false);
+    commentsAbortRef.current?.abort();
+    commentsAbortRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
+    return () => {
+      commentsAbortRef.current?.abort();
+    };
+  }, []);
+
+  const loadComments = useCallback(
+    async ({ page, append = false }: { page: number; append?: boolean }) => {
+      const controller = new AbortController();
+      commentsAbortRef.current?.abort();
+      commentsAbortRef.current = controller;
+
+      if (!append) {
+        setIsCommentsLoading(true);
+        setCommentsError(null);
+      }
+
+      try {
+        const response = await fetchComments(id, {
+          page,
+          size: COMMENTS_PAGE_SIZE,
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const items = Array.isArray(response.items) ? response.items : [];
+
+        setCommentsList((previous) => {
+          if (append) {
+            const existingIds = new Set(previous.map((item) => item.id));
+            const merged = [...previous];
+
+            for (const item of items) {
+              if (!existingIds.has(item.id)) {
+                merged.push(item);
+              }
+            }
+
+            return merged;
+          }
+
+          return items;
+        });
+
+        const nextPage = typeof response.page === "number" ? response.page : page;
+        const size = typeof response.size === "number" ? response.size : COMMENTS_PAGE_SIZE;
+        const total = typeof response.total === "number" ? response.total : items.length;
+
+        setCommentsPage(nextPage);
+        setHasMoreComments(total > nextPage * size);
+
+        setCommentReactions((previous) => {
+          const base = append ? { ...previous } : {};
+
+          for (const item of items) {
+            if (!base[item.id]) {
+              base[item.id] = { liked: false, disliked: false };
+            }
+          }
+
+          return base;
+        });
+
+        if (!append) {
+          setReactionPendingByComment({});
+        }
+
+        applyMetrics(undefined, { comments: total });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        if (!append) {
+          setCommentsError("Не удалось загрузить комментарии");
         } else {
-          newState[commentId] = { ...current, liked: true, likes: current.likes + 1 };
+          toast.error("Не удалось загрузить дополнительные комментарии");
+        }
+      } finally {
+        if (!append) {
+          setIsCommentsLoading(false);
+        }
+
+        if (commentsAbortRef.current === controller) {
+          commentsAbortRef.current = null;
         }
       }
-      return newState;
-    });
-  };
+    },
+    [applyMetrics, id]
+  );
 
-  const handleCommentDislike = (commentId: number) => {
-    setCommentReactions(prev => {
-      const current = prev[commentId];
-      const newState = { ...prev };
-      
-      if (current.disliked) {
-        newState[commentId] = { ...current, disliked: false, dislikes: current.dislikes - 1 };
-      } else {
-        if (current.liked) {
-          newState[commentId] = { ...current, liked: false, likes: current.likes - 1, disliked: true, dislikes: current.dislikes + 1 };
-        } else {
-          newState[commentId] = { ...current, disliked: true, dislikes: current.dislikes + 1 };
+  useEffect(() => {
+    if (!showComments) {
+      commentsAbortRef.current?.abort();
+      return;
+    }
+
+    loadComments({ page: 1 });
+  }, [loadComments, showComments]);
+
+  const applyCommentMetrics = useCallback(
+    (
+      commentId: string,
+      response?: CommentResponse | null,
+      fallback?: { likes?: number; dislikes?: number }
+    ) => {
+      const metrics: { likes?: number; dislikes?: number } = {};
+
+      const sources = [
+        response
+          ? {
+              likes:
+                typeof response.likeCount === "number" && Number.isFinite(response.likeCount)
+                  ? response.likeCount
+                  : undefined,
+              dislikes:
+                typeof response.dislikeCount === "number" && Number.isFinite(response.dislikeCount)
+                  ? response.dislikeCount
+                  : undefined,
+            }
+          : undefined,
+        fallback,
+      ];
+
+      for (const source of sources) {
+        if (!source) {
+          continue;
+        }
+
+        if (typeof source.likes === "number" && Number.isFinite(source.likes)) {
+          metrics.likes = source.likes;
+        }
+
+        if (typeof source.dislikes === "number" && Number.isFinite(source.dislikes)) {
+          metrics.dislikes = source.dislikes;
         }
       }
-      return newState;
-    });
-  };
+
+      if (metrics.likes === undefined && metrics.dislikes === undefined) {
+        return metrics;
+      }
+
+      setCommentsList((previous) =>
+        previous.map((comment) => {
+          if (comment.id !== commentId) {
+            return comment;
+          }
+
+          return {
+            ...comment,
+            likeCount: metrics.likes ?? comment.likeCount,
+            dislikeCount: metrics.dislikes ?? comment.dislikeCount,
+          };
+        })
+      );
+
+      return metrics;
+    },
+    []
+  );
+
+  const handleCommentLike = useCallback(
+    async (commentId: string) => {
+      if (reactionPendingByComment[commentId]) {
+        return;
+      }
+
+      const comment = commentsList.find((item) => item.id === commentId);
+
+      if (!comment) {
+        return;
+      }
+
+      const reaction = commentReactions[commentId] ?? { liked: false, disliked: false };
+      const likeCountSafe = typeof comment.likeCount === "number" ? comment.likeCount : 0;
+      const dislikeCountSafe = typeof comment.dislikeCount === "number" ? comment.dislikeCount : 0;
+
+      setReactionPendingByComment((previous) => ({ ...previous, [commentId]: true }));
+
+      const previousState = {
+        liked: reaction.liked,
+        disliked: reaction.disliked,
+        likes: likeCountSafe,
+        dislikes: dislikeCountSafe,
+      };
+
+      try {
+        if (reaction.liked) {
+          setCommentReactions((previous) => ({ ...previous, [commentId]: { liked: false, disliked: false } }));
+          const nextLikes = Math.max(0, likeCountSafe - 1);
+          applyCommentMetrics(commentId, undefined, {
+            likes: nextLikes,
+            dislikes: dislikeCountSafe,
+          });
+          const response = await clearCommentReaction(commentId);
+          applyCommentMetrics(commentId, response, {
+            likes: nextLikes,
+            dislikes: dislikeCountSafe,
+          });
+        } else {
+          const nextLikes = likeCountSafe + 1;
+          const nextDislikes = reaction.disliked ? Math.max(0, dislikeCountSafe - 1) : dislikeCountSafe;
+          setCommentReactions((previous) => ({ ...previous, [commentId]: { liked: true, disliked: false } }));
+          applyCommentMetrics(commentId, undefined, {
+            likes: nextLikes,
+            dislikes: nextDislikes,
+          });
+          const response = await sendCommentLike(commentId);
+          applyCommentMetrics(commentId, response, {
+            likes: nextLikes,
+            dislikes: nextDislikes,
+          });
+        }
+      } catch (error) {
+        setCommentReactions((previous) => ({
+          ...previous,
+          [commentId]: { liked: previousState.liked, disliked: previousState.disliked },
+        }));
+        applyCommentMetrics(commentId, undefined, {
+          likes: previousState.likes,
+          dislikes: previousState.dislikes,
+        });
+        toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+      } finally {
+        setReactionPendingByComment((previous) => ({ ...previous, [commentId]: false }));
+      }
+    },
+    [applyCommentMetrics, commentReactions, commentsList, reactionPendingByComment]
+  );
+
+  const handleCommentDislike = useCallback(
+    async (commentId: string) => {
+      if (reactionPendingByComment[commentId]) {
+        return;
+      }
+
+      const comment = commentsList.find((item) => item.id === commentId);
+
+      if (!comment) {
+        return;
+      }
+
+      const reaction = commentReactions[commentId] ?? { liked: false, disliked: false };
+      const likeCountSafe = typeof comment.likeCount === "number" ? comment.likeCount : 0;
+      const dislikeCountSafe = typeof comment.dislikeCount === "number" ? comment.dislikeCount : 0;
+
+      setReactionPendingByComment((previous) => ({ ...previous, [commentId]: true }));
+
+      const previousState = {
+        liked: reaction.liked,
+        disliked: reaction.disliked,
+        likes: likeCountSafe,
+        dislikes: dislikeCountSafe,
+      };
+
+      try {
+        if (reaction.disliked) {
+          setCommentReactions((previous) => ({ ...previous, [commentId]: { liked: false, disliked: false } }));
+          const nextDislikes = Math.max(0, dislikeCountSafe - 1);
+          applyCommentMetrics(commentId, undefined, {
+            dislikes: nextDislikes,
+            likes: likeCountSafe,
+          });
+          const response = await clearCommentReaction(commentId);
+          applyCommentMetrics(commentId, response, {
+            dislikes: nextDislikes,
+            likes: likeCountSafe,
+          });
+        } else {
+          const nextDislikes = dislikeCountSafe + 1;
+          const nextLikes = reaction.liked ? Math.max(0, likeCountSafe - 1) : likeCountSafe;
+          setCommentReactions((previous) => ({ ...previous, [commentId]: { liked: false, disliked: true } }));
+          applyCommentMetrics(commentId, undefined, {
+            dislikes: nextDislikes,
+            likes: nextLikes,
+          });
+          const response = await sendCommentDislike(commentId);
+          applyCommentMetrics(commentId, response, {
+            dislikes: nextDislikes,
+            likes: nextLikes,
+          });
+        }
+      } catch (error) {
+        setCommentReactions((previous) => ({
+          ...previous,
+          [commentId]: { liked: previousState.liked, disliked: previousState.disliked },
+        }));
+        applyCommentMetrics(commentId, undefined, {
+          likes: previousState.likes,
+          dislikes: previousState.dislikes,
+        });
+        toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+      } finally {
+        setReactionPendingByComment((previous) => ({ ...previous, [commentId]: false }));
+      }
+    },
+    [applyCommentMetrics, commentReactions, commentsList, reactionPendingByComment]
+  );
+
+  const handleAddComment = useCallback(async () => {
+    if (!newComment.trim()) {
+      toast.error("Введите текст комментария");
+      return;
+    }
+
+    const payload = {
+      text: newComment.trim(),
+      name: isAnonymous ? null : firstName.trim() || null,
+      surname: isAnonymous ? null : lastName.trim() || null,
+    };
+
+    const nextTotal = commentCount + 1;
+
+    setIsSubmittingComment(true);
+
+    try {
+      await createComment(id, payload);
+
+      toast.success("Комментарий добавлен!");
+      setNewComment("");
+      setFirstName("");
+      setLastName("");
+      setIsAnonymous(false);
+
+      applyMetrics(undefined, { comments: nextTotal });
+
+      await loadComments({ page: 1 });
+    } catch (error) {
+      toast.error("Не удалось добавить комментарий. Попробуйте ещё раз.");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  }, [applyMetrics, commentCount, firstName, id, isAnonymous, lastName, loadComments, newComment]);
 
   // Format number to K format (1000 -> 1K)
   const formatNumber = (num: number): string => {
     if (num >= 1000) {
-      return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+      return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
     }
     return num.toString();
   };
@@ -179,45 +754,6 @@ export function NewsCard({
     }
   };
 
-  const mockComments = [
-    {
-      id: 1,
-      author: "Алексей К.",
-      text: "Очень интересная статья! Спасибо за информацию.",
-      date: "2 часа назад",
-    },
-    {
-      id: 2,
-      author: "Мария С.",
-      text: "Согласна с автором. Эта тема действительно актуальна сейчас.",
-      date: "3 часа назад",
-    },
-    {
-      id: 3,
-      author: "Дмитрий П.",
-      text: "Хотелось бы увидеть больше примеров из практики.",
-      date: "5 часов назад",
-    },
-    {
-      id: 4,
-      author: "Анна М.",
-      text: "Отличный материал для изучения темы!",
-      date: "1 день назад",
-    },
-    {
-      id: 5,
-      author: "Игорь Р.",
-      text: "Буду ждать продолжения этой серии статей.",
-      date: "1 день назад",
-    },
-  ];
-
-  const commentsPerPage = 3;
-  const startIndex = (currentPage - 1) * commentsPerPage;
-  const endIndex = startIndex + commentsPerPage;
-  const currentComments = mockComments.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(mockComments.length / commentsPerPage);
-
   return (
     <article className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
       {/* Header */}
@@ -236,9 +772,9 @@ export function NewsCard({
           </div>
         </div>
 
-        <h3 
+        <h3
           className="mb-3 hover:text-primary transition-colors cursor-pointer font-semibold"
-          onClick={() => onViewPost && onViewPost({ id, title, excerpt, image, category, date, likes: initialLikes, comments, views })}
+          onClick={() => onViewPost?.()}
         >
           {title}
         </h3>
@@ -248,8 +784,7 @@ export function NewsCard({
         </p>
       </div>
 
-      {/* Image */}
-      {image && (
+      {typeof image === "string" && image.trim() !== "" && (
         <div className="px-5 pb-4">
           <div className="relative aspect-[16/9] overflow-hidden rounded-xl">
             <ImageWithFallback
@@ -265,7 +800,7 @@ export function NewsCard({
       {!isExpanded && (
         <div className="px-5 pb-4">
           <button
-            onClick={() => setIsExpanded(true)}
+            onClick={handleExpand}
             className="text-sm text-primary hover:underline"
           >
             Показать полностью
@@ -276,98 +811,17 @@ export function NewsCard({
       {/* Expanded Content */}
       {isExpanded && (
         <div className="px-5 pb-4 space-y-4">
-          <div>
-            <h4 className="mb-2">Введение</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              В современном мире технологии развиваются с невероятной скоростью, и искусственный интеллект становится 
-              неотъемлемой частью нашей повседневной жизни. От умных помощников до автономных транспортных средств — 
-              AI меняет способы взаимодействия людей с окружающим миром.
-            </p>
-          </div>
+          {content ? (
+            <TipTapContent content={content} className="space-y-4" />
+          ) : (
+            <p className="text-sm text-muted-foreground leading-relaxed">{excerpt}</p>
+          )}
 
-          <div className="relative aspect-video overflow-hidden rounded-xl">
-            <img
-              src="https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800"
-              alt="AI Technology"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          <div>
-            <h4 className="mb-2">Ключевые тренды 2025 года</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              Эксперты выделяют несколько основных направлений развития технологий в этом году:
-            </p>
-            <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground ml-2">
-              <li>Генеративный AI и большие языковые модели</li>
-              <li>Автоматизация бизнес-процессов с помощью машинного обучения</li>
-              <li>Развитие квантовых вычислений</li>
-              <li>Внедрение 5G и 6G технологий</li>
-            </ul>
-          </div>
-
-          <div className="bg-gray-50 border-l-4 border-blue-600 p-4 rounded-r-lg">
-            <p className="text-sm italic text-gray-700">
-              "Искусственный интеллект — это не просто технология будущего, это инструмент, который уже сегодня 
-              помогает компаниям повышать эффективность и создавать инновационные решения." 
-              <span className="block mt-2 not-italic">— Эксперт по AI технологиям</span>
-            </p>
-          </div>
-
-          <div>
-            <h4 className="mb-2">Практическое применение</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              Казахстанские компании активно внедряют AI-решения в различных сферах. Например, <a href="#" className="text-primary hover:underline">финтех-стартапы</a> используют 
-              машинное обучение для анализа кредитных рисков, а ритейлеры применяют компьютерное зрение для оптимизации 
-              складских операций.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <img
-                src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=400"
-                alt="AI in Business"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <img
-                src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400"
-                alt="Technology Innovation"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-
-          <div>
-            <h4 className="mb-2">Вызовы и перспективы</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Несмотря на очевидные преимущества, внедрение AI-технологий сопряжено с рядом вы��овов. Это вопросы 
-              этики, конфиденциальности данных, необходимости переквалификации специалистов и создания соответствующей 
-              инфраструктуры. Однако эксперты уверены, что польза от внедрения искусственного интеллекта значительно 
-              превосходит возможные риски.
-            </p>
-          </div>
-
-          <div className="pt-4 border-t border-gray-200">
-            <p className="text-xs text-muted-foreground mb-2">Читайте также:</p>
-            <div className="space-y-2">
-              <a href="#" className="block text-sm text-primary hover:underline">→ Топ-10 AI-стартапов Казахстана 2025</a>
-              <a href="#" className="block text-sm text-primary hover:underline">→ Как внедрить AI в малый бизнес</a>
-              <a href="#" className="block text-sm text-primary hover:underline">→ Будущее рынка труда в эпоху AI</a>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="text-sm text-primary hover:underline"
-          >
+          <button onClick={() => setIsExpanded(false)} className="text-sm text-primary hover:underline">
             Свернуть
           </button>
         </div>
       )}
-
       {/* Footer */}
       <div className="px-5 pb-5">
         <div className="flex items-center justify-between gap-2">
@@ -377,6 +831,7 @@ export function NewsCard({
               variant="ghost"
               size="sm"
               onClick={handleLike}
+              disabled={isReactionPending}
               className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                 isLiked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
               }`}
@@ -388,6 +843,7 @@ export function NewsCard({
               variant="ghost"
               size="sm"
               onClick={handleDislike}
+              disabled={isReactionPending}
               className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                 isDisliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
               }`}
@@ -398,15 +854,15 @@ export function NewsCard({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowComments(!showComments)}
+              onClick={() => setShowComments((value) => !value)}
               className="gap-1 h-8 px-1.5 sm:px-2 hover:text-primary hover:bg-primary/5"
             >
               <MessageCircle className="w-4 h-4" />
-              <span className="text-sm">{comments}</span>
+              <span className="text-sm">{commentCount}</span>
             </Button>
             <div className="flex items-center gap-1 text-muted-foreground">
               <Eye className="w-4 h-4" />
-              <span className="text-sm">{formatNumber(views)}</span>
+              <span className="text-sm">{formatNumber(viewCount)}</span>
             </div>
             <Popover>
               <PopoverTrigger asChild>
@@ -516,7 +972,7 @@ export function NewsCard({
       {showComments && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-sm">Комментарии ({mockComments.length})</h4>
+            <h4 className="text-sm">Комментарии ({commentCount})</h4>
             <Button
               variant="ghost"
               size="sm"
@@ -526,84 +982,122 @@ export function NewsCard({
               Свернуть
             </Button>
           </div>
-          
-          {/* New Comment Input */}
-          <div className="mb-4">
+
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox
+                id={`anonymous-${id}`}
+                checked={isAnonymous}
+                onCheckedChange={(checked) => setIsAnonymous(Boolean(checked))}
+                disabled={isSubmittingComment}
+              />
+              <label htmlFor={`anonymous-${id}`} className="text-sm cursor-pointer">
+                Анонимно
+              </label>
+            </div>
+
+            {!isAnonymous && (
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Имя"
+                  className="text-sm"
+                  disabled={isSubmittingComment}
+                />
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Фамилия"
+                  className="text-sm"
+                  disabled={isSubmittingComment}
+                />
+              </div>
+            )}
+
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Написать комментарий..."
-              className="resize-none mb-2"
+              className="resize-none"
               rows={2}
+              disabled={isSubmittingComment}
             />
-            <Button size="sm" className="w-full">Отправить</Button>
+            <Button size="sm" className="w-full" onClick={handleAddComment} disabled={isSubmittingComment}>
+              {isSubmittingComment ? "Отправка..." : "Отправить"}
+            </Button>
           </div>
 
-          {/* Comments List */}
           <div className="space-y-3">
-            {currentComments.map((comment) => (
-              <div key={comment.id} className="bg-white p-3 rounded-lg border border-gray-100">
-                <div className="flex items-start justify-between mb-1">
-                  <span className="text-sm">{comment.author}</span>
-                  <span className="text-xs text-muted-foreground">{comment.date}</span>
-                </div>
-                <p className="text-sm text-gray-700 mb-2">{comment.text}</p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCommentLike(comment.id)}
-                    className={`gap-1.5 h-7 px-2 text-xs ${
-                      commentReactions[comment.id]?.liked
-                        ? "text-blue-600 hover:text-blue-700"
-                        : "hover:text-primary"
-                    }`}
-                  >
-                    <ThumbsUp className={`w-3 h-3 ${commentReactions[comment.id]?.liked ? "fill-blue-600" : ""}`} />
-                    <span>{commentReactions[comment.id]?.likes || 0}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCommentDislike(comment.id)}
-                    className={`gap-1.5 h-7 px-2 text-xs ${
-                      commentReactions[comment.id]?.disliked
-                        ? "text-red-600 hover:text-red-700"
-                        : "hover:text-primary"
-                    }`}
-                  >
-                    <ThumbsDown className={`w-3 h-3 ${commentReactions[comment.id]?.disliked ? "fill-red-600" : ""}`} />
-                    <span>{commentReactions[comment.id]?.dislikes || 0}</span>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+            {isCommentsLoading && commentsList.length === 0 && (
+              <div className="text-sm text-muted-foreground">Загрузка комментариев...</div>
+            )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-4">
+            {commentsError && commentsList.length === 0 && (
+              <div className="space-y-2">
+                <div className="text-sm text-red-500">{commentsError}</div>
+                <Button variant="outline" size="sm" onClick={() => loadComments({ page: 1 })}>
+                  Попробовать снова
+                </Button>
+              </div>
+            )}
+
+            {!isCommentsLoading && !commentsError && commentsList.length === 0 && (
+              <div className="text-sm text-muted-foreground">Комментариев пока нет</div>
+            )}
+
+            {commentsList.map((comment) => {
+              const reaction = commentReactions[comment.id] ?? { liked: false, disliked: false };
+              const isPending = reactionPendingByComment[comment.id] === true;
+
+              return (
+                <div key={comment.id} className="bg-white p-3 rounded-lg border border-gray-100">
+                  <div className="flex items-start justify-between mb-1">
+                    <span className="text-sm">{getCommentAuthor(comment.authorName)}</span>
+                    <span className="text-xs text-muted-foreground">{getCommentDisplayDate(comment.createdAt)}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{comment.content}</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCommentLike(comment.id)}
+                      disabled={isPending}
+                      className={`gap-1.5 h-7 px-2 text-xs ${
+                        reaction.liked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
+                      }`}
+                    >
+                      <ThumbsUp className={`w-3 h-3 ${reaction.liked ? "fill-blue-600" : ""}`} />
+                      <span>{comment.likeCount ?? 0}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCommentDislike(comment.id)}
+                      disabled={isPending}
+                      className={`gap-1.5 h-7 px-2 text-xs ${
+                        reaction.disliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
+                      }`}
+                    >
+                      <ThumbsDown className={`w-3 h-3 ${reaction.disliked ? "fill-red-600" : ""}`} />
+                      <span>{comment.dislikeCount ?? 0}</span>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {hasMoreComments && !isCommentsLoading && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
+                className="w-full mt-2 hover:text-primary hover:bg-primary/5"
+                onClick={() => loadComments({ page: commentsPage + 1, append: true })}
               >
-                Назад
+                Показать ещё
               </Button>
-              <span className="text-sm text-muted-foreground">
-                {currentPage} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Далее
-              </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </article>
