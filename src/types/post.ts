@@ -20,7 +20,7 @@ export interface PostSummary {
   id: string;
   title: string;
   excerpt: string;
-  image: string;
+  image?: string | null;
   category: string;
   date: string;
   likes: number;
