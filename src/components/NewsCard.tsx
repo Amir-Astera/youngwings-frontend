@@ -42,6 +42,7 @@ interface NewsCardProps {
     postId: string,
     metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
   ) => void;
+  visibilityObserver?: (element: HTMLElement | null, postId: string) => void;
 }
 
 function getCommentDisplayDate(createdAt?: string): string {
@@ -90,6 +91,7 @@ export function NewsCard({
   views,
   onViewPost,
   onPostUpdate,
+  visibilityObserver,
 }: NewsCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
@@ -115,6 +117,20 @@ export function NewsCard({
   const [reactionPendingByComment, setReactionPendingByComment] = useState<Record<string, boolean>>({});
   const [hasRegisteredView, setHasRegisteredView] = useState(() => hasViewBeenRecorded(id));
   const commentsAbortRef = useRef<AbortController | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!visibilityObserver) {
+      return undefined;
+    }
+
+    const element = cardRef.current;
+    visibilityObserver(element, id);
+
+    return () => {
+      visibilityObserver(null, id);
+    };
+  }, [id, visibilityObserver]);
 
   const applyMetrics = useCallback(
     (
@@ -755,7 +771,10 @@ export function NewsCard({
   };
 
   return (
-    <article className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+    <article
+      ref={cardRef}
+      className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
+    >
       {/* Header */}
       <div className="p-5 pb-4">
         <div className="flex items-start gap-3 mb-3">

@@ -1,8 +1,10 @@
 import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
-import type { PostResponse } from "../types/post";
+import type { PostCountersUpdate, PostListResponse, PostResponse } from "../types/post";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
+const POST_COUNTERS_ENDPOINT = "/api/post/counters";
+const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/counters/stream";
 const CSRF_COOKIE_NAME = "yw_csrf";
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -72,8 +74,23 @@ async function apiRequest(path: string, init: RequestInit = {}): Promise<Respons
   });
 }
 
-export async function fetchAllPosts(signal?: AbortSignal): Promise<PostResponse[]> {
-  const response = await apiRequest(POSTS_ENDPOINT, {
+export async function fetchAllPosts({
+  page = 1,
+  size = 20,
+  signal,
+}: {
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+} = {}): Promise<PostListResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
+
+  const endpoint = `${POSTS_ENDPOINT}${POSTS_ENDPOINT.includes("?") ? "&" : "?"}${params.toString()}`;
+
+  const response = await apiRequest(endpoint, {
     method: "GET",
     signal,
   });
@@ -82,13 +99,80 @@ export async function fetchAllPosts(signal?: AbortSignal): Promise<PostResponse[
     throw new Error("Не удалось получить список публикаций");
   }
 
-  const parsed = await parseJsonResponse<PostResponse[]>(response);
+  const parsed = await parseJsonResponse<PostListResponse>(response);
 
   if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return {
+    total: typeof parsed.total === "number" ? parsed.total : 0,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
+}
+
+export async function fetchPostCounters(
+  ids: string[],
+  signal?: AbortSignal,
+): Promise<PostCountersUpdate[]> {
+  if (!Array.isArray(ids) || ids.length === 0) {
     return [];
   }
 
-  return parsed;
+  const sanitizedIds = ids.filter((id) => typeof id === "string" && id.trim() !== "");
+
+  if (sanitizedIds.length === 0) {
+    return [];
+  }
+
+  const params = new URLSearchParams({ ids: sanitizedIds.join(",") });
+
+  const response = await apiRequest(`${POST_COUNTERS_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить счётчики публикаций");
+  }
+
+  const parsed = await parseJsonResponse<PostCountersUpdate[] | PostCountersUpdate>(response);
+
+  const normalize = (value: unknown): PostCountersUpdate[] => {
+    if (Array.isArray(value)) {
+      return value.filter((item): item is PostCountersUpdate => typeof item === "object" && item !== null);
+    }
+
+    if (value && typeof value === "object") {
+      return [value as PostCountersUpdate];
+    }
+
+    return [];
+  };
+
+  return normalize(parsed).filter((item) => typeof item.id === "string" && item.id.trim() !== "");
+}
+
+export function createPostCountersEventSource(ids: string[]): EventSource {
+  const sanitizedIds = Array.isArray(ids)
+    ? ids.filter((id) => typeof id === "string" && id.trim() !== "")
+    : [];
+
+  if (sanitizedIds.length === 0) {
+    throw new Error("Невозможно подписаться на пустой список публикаций");
+  }
+
+  const params = new URLSearchParams({ ids: sanitizedIds.join(",") });
+  const url = `${POST_COUNTERS_STREAM_ENDPOINT}?${params.toString()}`;
+
+  return new EventSource(buildUrl(url), { withCredentials: true });
 }
 
 async function sendReactionRequest(
