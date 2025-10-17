@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ThumbsUp, ThumbsDown, MessageCircle, Share2, Eye, ChevronDown, MessageSquare, Twitter, Facebook, Link2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -7,6 +7,9 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner@2.0.3";
 import placeholderImage from "../assets/news-placeholder.svg";
 import { TipTapContent } from "./TipTapContent";
+import { clearPostReaction, registerPostView, sendPostDislike, sendPostLike } from "../lib/api";
+import { hasViewBeenRecorded, markViewRecorded } from "../lib/clientState";
+import type { PostResponse } from "../types/post";
 
 interface NewsCardProps {
   id: string;
@@ -22,6 +25,7 @@ interface NewsCardProps {
   views: number;
   isAd?: boolean;
   onViewPost?: () => void;
+  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
 }
 
 export function NewsCard({
@@ -37,15 +41,20 @@ export function NewsCard({
   comments,
   views,
   onViewPost,
+  onPostUpdate,
 }: NewsCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
   const [likeCount, setLikeCount] = useState(likes);
   const [dislikeCount, setDislikeCount] = useState(dislikes);
+  const [viewCount, setViewCount] = useState(views);
   const [showComments, setShowComments] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [newComment, setNewComment] = useState("");
+  const [isReactionPending, setIsReactionPending] = useState(false);
+  const [isViewPending, setIsViewPending] = useState(false);
+  const [hasRegisteredView, setHasRegisteredView] = useState(() => hasViewBeenRecorded(id));
 
   const [commentReactions, setCommentReactions] = useState<{[key: number]: {liked: boolean, disliked: boolean, likes: number, dislikes: number}}>({
     1: { liked: false, disliked: false, likes: 12, dislikes: 2 },
@@ -55,33 +64,208 @@ export function NewsCard({
     5: { liked: false, disliked: false, likes: 9, dislikes: 1 },
   });
 
-  const handleLike = () => {
-    if (isLiked) {
-      setLikeCount(likeCount - 1);
-      setIsLiked(false);
-    } else {
-      if (isDisliked) {
-        setDislikeCount(dislikeCount - 1);
-        setIsDisliked(false);
-      }
-      setLikeCount(likeCount + 1);
-      setIsLiked(true);
-    }
-  };
+  const applyMetrics = useCallback(
+    (response?: PostResponse | null, fallback?: { likes?: number; dislikes?: number; views?: number }) => {
+      const metrics: { likes?: number; dislikes?: number; views?: number } = {};
 
-  const handleDislike = () => {
-    if (isDisliked) {
-      setDislikeCount(dislikeCount - 1);
-      setIsDisliked(false);
-    } else {
-      if (isLiked) {
-        setLikeCount(likeCount - 1);
-        setIsLiked(false);
+      const sources = [
+        response
+          ? {
+              likes:
+                typeof response.likeCount === "number" && Number.isFinite(response.likeCount)
+                  ? response.likeCount
+                  : undefined,
+              dislikes:
+                typeof response.dislikeCount === "number" && Number.isFinite(response.dislikeCount)
+                  ? response.dislikeCount
+                  : undefined,
+              views:
+                typeof response.viewCount === "number" && Number.isFinite(response.viewCount)
+                  ? response.viewCount
+                  : undefined,
+            }
+          : undefined,
+        fallback,
+      ];
+
+      for (const source of sources) {
+        if (!source) {
+          continue;
+        }
+
+        if (typeof source.likes === "number" && Number.isFinite(source.likes)) {
+          metrics.likes = source.likes;
+        }
+
+        if (typeof source.dislikes === "number" && Number.isFinite(source.dislikes)) {
+          metrics.dislikes = source.dislikes;
+        }
+
+        if (typeof source.views === "number" && Number.isFinite(source.views)) {
+          metrics.views = source.views;
+        }
       }
-      setDislikeCount(dislikeCount + 1);
-      setIsDisliked(true);
+
+      if (metrics.likes !== undefined) {
+        setLikeCount(metrics.likes);
+      }
+
+      if (metrics.dislikes !== undefined) {
+        setDislikeCount(metrics.dislikes);
+      }
+
+      if (metrics.views !== undefined) {
+        setViewCount(metrics.views);
+      }
+
+      if (onPostUpdate && Object.keys(metrics).length > 0) {
+        onPostUpdate(id, metrics);
+      }
+
+      return metrics;
+    },
+    [id, onPostUpdate]
+  );
+
+  const handleLike = useCallback(async () => {
+    if (isReactionPending) {
+      return;
     }
-  };
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isLiked) {
+        const nextLikes = Math.max(0, previous.likeCount - 1);
+        setIsLiked(false);
+        setLikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(id);
+        applyMetrics(response, { likes: nextLikes, dislikes: previous.dislikeCount });
+      } else {
+        setIsLiked(true);
+        setLikeCount((value) => value + 1);
+
+        if (isDisliked) {
+          setIsDisliked(false);
+          setDislikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostLike(id);
+        const nextLikes = previous.likeCount + 1;
+        const nextDislikes = isDisliked ? Math.max(0, previous.dislikeCount - 1) : previous.dislikeCount;
+        applyMetrics(response, {
+          likes: nextLikes,
+          dislikes: nextDislikes,
+        });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount]);
+
+  const handleDislike = useCallback(async () => {
+    if (isReactionPending) {
+      return;
+    }
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isDisliked) {
+        const nextDislikes = Math.max(0, previous.dislikeCount - 1);
+        setIsDisliked(false);
+        setDislikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(id);
+        applyMetrics(response, { dislikes: nextDislikes, likes: previous.likeCount });
+      } else {
+        setIsDisliked(true);
+        setDislikeCount((value) => value + 1);
+
+        if (isLiked) {
+          setIsLiked(false);
+          setLikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostDislike(id);
+        const nextDislikes = previous.dislikeCount + 1;
+        const nextLikes = isLiked ? Math.max(0, previous.likeCount - 1) : previous.likeCount;
+        applyMetrics(response, {
+          dislikes: nextDislikes,
+          likes: nextLikes,
+        });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount]);
+
+  const handleExpand = useCallback(() => {
+    setIsExpanded(true);
+
+    if (hasRegisteredView || isViewPending) {
+      return;
+    }
+
+    setIsViewPending(true);
+    const previous = viewCount;
+    setViewCount((value) => value + 1);
+
+    registerPostView(id)
+      .then((response) => {
+        markViewRecorded(id);
+        setHasRegisteredView(true);
+        applyMetrics(response, { views: previous + 1 });
+      })
+      .catch(() => {
+        setViewCount(previous);
+        toast.error("Не удалось отметить просмотр. Попробуйте ещё раз.");
+      })
+      .finally(() => {
+        setIsViewPending(false);
+      });
+  }, [applyMetrics, hasRegisteredView, id, isViewPending, viewCount]);
+
+  useEffect(() => {
+    setLikeCount(likes);
+  }, [likes]);
+
+  useEffect(() => {
+    setDislikeCount(dislikes);
+  }, [dislikes]);
+
+  useEffect(() => {
+    setViewCount(views);
+  }, [views]);
+
+  useEffect(() => {
+    setHasRegisteredView(hasViewBeenRecorded(id));
+  }, [id]);
 
   const handleCommentLike = (commentId: number) => {
     setCommentReactions(prev => {
@@ -269,7 +453,7 @@ export function NewsCard({
       {!isExpanded && (
         <div className="px-5 pb-4">
           <button
-            onClick={() => setIsExpanded(true)}
+            onClick={handleExpand}
             className="text-sm text-primary hover:underline"
           >
             Показать полностью
@@ -300,6 +484,7 @@ export function NewsCard({
               variant="ghost"
               size="sm"
               onClick={handleLike}
+              disabled={isReactionPending}
               className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                 isLiked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
               }`}
@@ -311,6 +496,7 @@ export function NewsCard({
               variant="ghost"
               size="sm"
               onClick={handleDislike}
+              disabled={isReactionPending}
               className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                 isDisliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
               }`}
@@ -329,7 +515,7 @@ export function NewsCard({
             </Button>
             <div className="flex items-center gap-1 text-muted-foreground">
               <Eye className="w-4 h-4" />
-              <span className="text-sm">{formatNumber(views)}</span>
+              <span className="text-sm">{formatNumber(viewCount)}</span>
             </div>
             <Popover>
               <PopoverTrigger asChild>

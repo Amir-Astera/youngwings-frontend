@@ -139,53 +139,87 @@ export default function App() {
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPosts = useCallback((signal?: AbortSignal) => {
-    setIsLoading(true);
-    setError(null);
+  const fetchPosts = useCallback(
+    ({ signal, background }: { signal?: AbortSignal; background?: boolean } = {}) => {
+      if (background) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+        setError(null);
+      }
 
-    fetchAllPosts(signal)
-      .then((data) => {
-        if (signal?.aborted) {
-          return;
-        }
+      fetchAllPosts(signal)
+        .then((data) => {
+          if (signal?.aborted) {
+            return;
+          }
 
-        const normalizedPosts = data.map((item: PostResponse) => mapPostResponseToSummary(item));
-        normalizedPosts.sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bTime - aTime;
+          const normalizedPosts = data.map((item: PostResponse) => mapPostResponseToSummary(item));
+          normalizedPosts.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          setPosts(normalizedPosts);
+          setCurrentPostData((previous) => {
+            if (!previous) {
+              return previous;
+            }
+
+            const updated = normalizedPosts.find((item) => item.id === previous.id);
+
+            if (!updated) {
+              return previous;
+            }
+
+            return {
+              ...previous,
+              ...updated,
+              raw: updated.raw ?? previous.raw,
+            };
+          });
+          setError(null);
+        })
+        .catch((caughtError: unknown) => {
+          if (signal?.aborted) {
+            return;
+          }
+
+          if (caughtError instanceof Error && caughtError.name === "AbortError") {
+            return;
+          }
+
+          if (!background) {
+            const message =
+              caughtError instanceof Error && caughtError.message
+                ? caughtError.message
+                : "Не удалось получить список публикаций";
+
+            setError(message);
+          }
+        })
+        .finally(() => {
+          if (signal?.aborted) {
+            return;
+          }
+
+          if (background) {
+            setIsRefreshing(false);
+          } else {
+            setIsLoading(false);
+          }
         });
-
-        setPosts(normalizedPosts);
-      })
-      .catch((caughtError: unknown) => {
-        if (caughtError instanceof Error && caughtError.name === "AbortError") {
-          return;
-        }
-
-        if (signal?.aborted) {
-          return;
-        }
-
-        const message =
-          caughtError instanceof Error && caughtError.message
-            ? caughtError.message
-            : "Не удалось получить список публикаций";
-
-        setError(message);
-      })
-      .finally(() => {
-        if (!signal?.aborted) {
-          setIsLoading(false);
-        }
-      });
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchPosts(controller.signal);
+    fetchPosts({ signal: controller.signal });
 
     return () => {
       controller.abort();
@@ -202,6 +236,18 @@ export default function App() {
     setViewingPost(false);
     setCurrentPostData(null);
   }, [currentPage]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (!isLoading && !isRefreshing) {
+        fetchPosts({ background: true });
+      }
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchPosts, isLoading, isRefreshing]);
 
   const handleViewPost = (postData?: PostSummary) => {
     if (!postData) {
@@ -223,6 +269,59 @@ export default function App() {
     }
   };
 
+  const handlePostMetricsUpdate = useCallback(
+    (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => {
+      setPosts((previousPosts) =>
+        previousPosts.map((item) => {
+          if (item.id !== postId) {
+            return item;
+          }
+
+          const updatedRaw = item.raw
+            ? {
+                ...item.raw,
+                likeCount: metrics.likes ?? item.raw.likeCount,
+                dislikeCount: metrics.dislikes ?? item.raw.dislikeCount,
+                viewCount: metrics.views ?? item.raw.viewCount,
+              }
+            : item.raw;
+
+          return {
+            ...item,
+            likes: metrics.likes ?? item.likes,
+            dislikes: metrics.dislikes ?? item.dislikes,
+            views: metrics.views ?? item.views,
+            raw: updatedRaw,
+          };
+        })
+      );
+
+      setCurrentPostData((previous) => {
+        if (!previous || previous.id !== postId) {
+          return previous;
+        }
+
+        const updatedRaw = previous.raw
+          ? {
+              ...previous.raw,
+              likeCount: metrics.likes ?? previous.raw.likeCount,
+              dislikeCount: metrics.dislikes ?? previous.raw.dislikeCount,
+              viewCount: metrics.views ?? previous.raw.viewCount,
+            }
+          : previous.raw;
+
+        return {
+          ...previous,
+          likes: metrics.likes ?? previous.likes,
+          dislikes: metrics.dislikes ?? previous.dislikes,
+          views: metrics.views ?? previous.views,
+          raw: updatedRaw,
+        };
+      });
+    },
+    []
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopHeader />
@@ -239,7 +338,11 @@ export default function App() {
             {/* Main Content */}
             <div className="min-h-[calc(100vh-10rem)]">
               {viewingPost && currentPage === "home" && (
-                <PostPage onBack={handleBackFromPost} postData={currentPostData} />
+                <PostPage
+                  onBack={handleBackFromPost}
+                  postData={currentPostData}
+                  onPostUpdate={handlePostMetricsUpdate}
+                />
               )}
               
               {!viewingPost && currentPage === "home" && (
@@ -267,7 +370,7 @@ export default function App() {
 
                   {posts.length > 0 && (
                     <>
-                      {isLoading && (
+                      {isRefreshing && (
                         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center text-sm text-muted-foreground">
                           Обновляем ленту...
                         </div>
@@ -275,7 +378,12 @@ export default function App() {
 
                       <div className="space-y-3 sm:space-y-5">
                         {posts.map((item) => (
-                          <NewsCard key={item.id} {...item} onViewPost={() => handleViewPost(item)} />
+                          <NewsCard
+                            key={item.id}
+                            {...item}
+                            onViewPost={() => handleViewPost(item)}
+                            onPostUpdate={handlePostMetricsUpdate}
+                          />
                         ))}
                       </div>
 
@@ -328,12 +436,17 @@ export default function App() {
                     description={getSubsectionDescription(sectionTitle)}
                     posts={posts.filter((item) => item.category === sectionTitle)}
                     onViewPost={handleViewPost}
+                    onPostUpdate={handlePostMetricsUpdate}
                   />
                 );
               })()}
               
               {currentPage.startsWith("subsection-") && viewingPost && (
-                <PostPage onBack={handleBackFromPost} postData={currentPostData} />
+                <PostPage
+                  onBack={handleBackFromPost}
+                  postData={currentPostData}
+                  onPostUpdate={handlePostMetricsUpdate}
+                />
               )}
 
               {currentPage === "events" && <EventsPage />}
@@ -366,11 +479,21 @@ export default function App() {
                   );
                 }
 
-                return <TopicPage topic={topicKey} posts={posts} onViewPost={handleViewPost} />;
+                return (
+                  <TopicPage
+                    topic={topicKey}
+                    posts={posts}
+                    onViewPost={handleViewPost}
+                    onPostUpdate={handlePostMetricsUpdate}
+                  />
+                );
               })()}
-              
               {currentPage.startsWith("topic-") && viewingPost && (
-                <PostPage onBack={handleBackFromPost} postData={currentPostData} />
+                <PostPage
+                  onBack={handleBackFromPost}
+                  postData={currentPostData}
+                  onPostUpdate={handlePostMetricsUpdate}
+                />
               )}
             </div>
 

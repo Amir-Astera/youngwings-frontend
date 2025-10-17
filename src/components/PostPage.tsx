@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThumbsUp, ThumbsDown, MessageCircle, Share2, Eye, ArrowLeft, Twitter, Facebook, Link2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -8,14 +8,17 @@ import { Checkbox } from "./ui/checkbox";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner@2.0.3";
 import { TipTapContent } from "./TipTapContent";
-import type { PostSummary } from "../types/post";
+import type { PostSummary, PostResponse } from "../types/post";
+import { clearPostReaction, registerPostView, sendPostDislike, sendPostLike } from "../lib/api";
+import { hasViewBeenRecorded, markViewRecorded } from "../lib/clientState";
 
 interface PostPageProps {
   onBack: () => void;
   postData?: PostSummary | null;
+  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
 }
 
-export function PostPage({ onBack, postData }: PostPageProps) {
+export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -24,6 +27,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
   const [isDisliked, setIsDisliked] = useState(false);
   const [likeCount, setLikeCount] = useState(postData?.likes ?? 0);
   const [dislikeCount, setDislikeCount] = useState(postData?.dislikes ?? 0);
+  const [viewCount, setViewCount] = useState(postData?.views ?? 0);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -63,6 +67,9 @@ export function PostPage({ onBack, postData }: PostPageProps) {
   ]);
 
   const [commentCount, setCommentCount] = useState(postData?.comments ?? comments.length);
+  const [isReactionPending, setIsReactionPending] = useState(false);
+  const [isViewPending, setIsViewPending] = useState(false);
+  const viewRegisteredRef = useRef(false);
 
   const [commentReactions, setCommentReactions] = useState<{[key: number]: {liked: boolean, disliked: boolean, likes: number, dislikes: number}}>({
     1: { liked: false, disliked: false, likes: 12, dislikes: 2 },
@@ -75,36 +82,193 @@ export function PostPage({ onBack, postData }: PostPageProps) {
   useEffect(() => {
     setLikeCount(postData?.likes ?? 0);
     setDislikeCount(postData?.dislikes ?? 0);
+    setViewCount(postData?.views ?? 0);
     setCommentCount(postData?.comments ?? comments.length);
+    setIsLiked(false);
+    setIsDisliked(false);
+    setIsReactionPending(false);
+    setIsViewPending(false);
+    viewRegisteredRef.current = hasViewBeenRecorded(postData?.id);
   }, [postData]);
 
-  const handleLike = () => {
-    if (isLiked) {
-      setLikeCount(likeCount - 1);
-      setIsLiked(false);
-    } else {
-      if (isDisliked) {
-        setDislikeCount(dislikeCount - 1);
-        setIsDisliked(false);
-      }
-      setLikeCount(likeCount + 1);
-      setIsLiked(true);
+  useEffect(() => {
+    if (!postData?.id || viewRegisteredRef.current || isViewPending) {
+      return;
     }
-  };
 
-  const handleDislike = () => {
-    if (isDisliked) {
-      setDislikeCount(dislikeCount - 1);
-      setIsDisliked(false);
-    } else {
-      if (isLiked) {
-        setLikeCount(likeCount - 1);
-        setIsLiked(false);
+    const currentViewCount = viewCount;
+    viewRegisteredRef.current = true;
+    setIsViewPending(true);
+    setViewCount((value) => value + 1);
+
+    registerPostView(postData.id)
+      .then((response) => {
+        markViewRecorded(postData.id);
+        applyMetrics(response, { views: currentViewCount + 1 });
+      })
+      .catch(() => {
+        viewRegisteredRef.current = false;
+        setViewCount(currentViewCount);
+      })
+      .finally(() => {
+        setIsViewPending(false);
+      });
+  }, [applyMetrics, isViewPending, postData?.id]);
+
+  const applyMetrics = useCallback(
+    (response?: PostResponse | null, fallback?: { likes?: number; dislikes?: number; views?: number }) => {
+      const metrics: { likes?: number; dislikes?: number; views?: number } = {};
+
+      const sources = [
+        response
+          ? {
+              likes:
+                typeof response.likeCount === "number" && Number.isFinite(response.likeCount)
+                  ? response.likeCount
+                  : undefined,
+              dislikes:
+                typeof response.dislikeCount === "number" && Number.isFinite(response.dislikeCount)
+                  ? response.dislikeCount
+                  : undefined,
+              views:
+                typeof response.viewCount === "number" && Number.isFinite(response.viewCount)
+                  ? response.viewCount
+                  : undefined,
+            }
+          : undefined,
+        fallback,
+      ];
+
+      for (const source of sources) {
+        if (!source) {
+          continue;
+        }
+
+        if (typeof source.likes === "number" && Number.isFinite(source.likes)) {
+          metrics.likes = source.likes;
+        }
+
+        if (typeof source.dislikes === "number" && Number.isFinite(source.dislikes)) {
+          metrics.dislikes = source.dislikes;
+        }
+
+        if (typeof source.views === "number" && Number.isFinite(source.views)) {
+          metrics.views = source.views;
+        }
       }
-      setDislikeCount(dislikeCount + 1);
-      setIsDisliked(true);
+
+      if (metrics.likes !== undefined) {
+        setLikeCount(metrics.likes);
+      }
+
+      if (metrics.dislikes !== undefined) {
+        setDislikeCount(metrics.dislikes);
+      }
+
+      if (metrics.views !== undefined) {
+        setViewCount(metrics.views);
+      }
+
+      if (postData?.id && onPostUpdate && Object.keys(metrics).length > 0) {
+        onPostUpdate(postData.id, metrics);
+      }
+
+      return metrics;
+    },
+    [onPostUpdate, postData?.id]
+  );
+
+  const handleLike = useCallback(async () => {
+    if (!postData?.id || isReactionPending) {
+      return;
     }
-  };
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isLiked) {
+        const nextLikes = Math.max(0, previous.likeCount - 1);
+        setIsLiked(false);
+        setLikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(postData.id);
+        applyMetrics(response, { likes: nextLikes, dislikes: previous.dislikeCount });
+      } else {
+        setIsLiked(true);
+        setLikeCount((value) => value + 1);
+
+        if (isDisliked) {
+          setIsDisliked(false);
+          setDislikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostLike(postData.id);
+        const nextLikes = previous.likeCount + 1;
+        const nextDislikes = isDisliked ? Math.max(0, previous.dislikeCount - 1) : previous.dislikeCount;
+        applyMetrics(response, { likes: nextLikes, dislikes: nextDislikes });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, postData?.id]);
+
+  const handleDislike = useCallback(async () => {
+    if (!postData?.id || isReactionPending) {
+      return;
+    }
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isDisliked) {
+        const nextDislikes = Math.max(0, previous.dislikeCount - 1);
+        setIsDisliked(false);
+        setDislikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(postData.id);
+        applyMetrics(response, { dislikes: nextDislikes, likes: previous.likeCount });
+      } else {
+        setIsDisliked(true);
+        setDislikeCount((value) => value + 1);
+
+        if (isLiked) {
+          setIsLiked(false);
+          setLikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostDislike(postData.id);
+        const nextDislikes = previous.dislikeCount + 1;
+        const nextLikes = isLiked ? Math.max(0, previous.likeCount - 1) : previous.likeCount;
+        applyMetrics(response, { dislikes: nextDislikes, likes: nextLikes });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, postData?.id]);
 
   const handleCommentLike = (commentId: number) => {
     setCommentReactions(prev => {
@@ -312,6 +476,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLike}
+                disabled={isReactionPending}
                 className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                   isLiked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
                 }`}
@@ -323,6 +488,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleDislike}
+                disabled={isReactionPending}
                 className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                   isDisliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
                 }`}
@@ -341,7 +507,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
               </Button>
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Eye className="w-4 h-4" />
-                <span className="text-sm">{formatNumber(postData?.views ?? 0)}</span>
+                <span className="text-sm">{formatNumber(viewCount)}</span>
               </div>
               <Popover>
                 <PopoverTrigger asChild>

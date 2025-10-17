@@ -6,9 +6,10 @@ interface SubsectionPageProps {
   description: string;
   posts: PostSummary[];
   onViewPost?: (postData?: PostSummary) => void;
+  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
 }
 
-export function SubsectionPage({ title, description, posts, onViewPost }: SubsectionPageProps) {
+export function SubsectionPage({ title, description, posts, onViewPost, onPostUpdate }: SubsectionPageProps) {
   const news = posts;
 
   return (
@@ -22,7 +23,14 @@ export function SubsectionPage({ title, description, posts, onViewPost }: Subsec
       {/* News Feed */}
       <div className="space-y-5">
         {news.length > 0 ? (
-          news.map((item) => <NewsCard key={item.id} {...item} onViewPost={() => onViewPost?.(item)} />)
+          news.map((item) => (
+            <NewsCard
+              key={item.id}
+              {...item}
+              onViewPost={() => onViewPost?.(item)}
+              onPostUpdate={onPostUpdate}
+            />
+          ))
         ) : (
           <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
             <p className="text-muted-foreground">

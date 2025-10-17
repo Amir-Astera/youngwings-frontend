@@ -5,6 +5,7 @@ interface TopicPageProps {
   topic: string;
   posts: PostSummary[];
   onViewPost?: (postData?: PostSummary) => void;
+  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
 }
 
 function normaliseTopic(value: string) {
@@ -15,7 +16,7 @@ function normaliseTopic(value: string) {
     .trim();
 }
 
-export function TopicPage({ topic, posts, onViewPost }: TopicPageProps) {
+export function TopicPage({ topic, posts, onViewPost, onPostUpdate }: TopicPageProps) {
   const topicName = topic.replace(/-/g, " ");
   const normalizedTopic = normaliseTopic(topicName);
 
@@ -40,7 +41,14 @@ export function TopicPage({ topic, posts, onViewPost }: TopicPageProps) {
       {/* Posts Feed */}
       <div className="space-y-5">
         {filteredPosts.length > 0 ? (
-          filteredPosts.map((post) => <NewsCard key={post.id} {...post} onViewPost={() => onViewPost?.(post)} />)
+          filteredPosts.map((post) => (
+            <NewsCard
+              key={post.id}
+              {...post}
+              onViewPost={() => onViewPost?.(post)}
+              onPostUpdate={onPostUpdate}
+            />
+          ))
         ) : (
           <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
             <p className="text-muted-foreground">
