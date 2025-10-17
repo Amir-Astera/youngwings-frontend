@@ -4,7 +4,7 @@ import type { PostCountersUpdate, PostListResponse, PostResponse } from "../type
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
 const POST_COUNTERS_ENDPOINT = "/api/post/counters";
-const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/counters/stream";
+const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/live";
 const CSRF_COOKIE_NAME = "yw_csrf";
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
