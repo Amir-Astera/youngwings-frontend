@@ -16,7 +16,7 @@ import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { TipTapContent } from "./TipTapContent";
 import type { PostSummary, PostResponse } from "../types/post";
 import type { CommentResponse } from "../types/comment";
@@ -104,11 +104,9 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
   const viewRegisteredRef = useRef(false);
   const commentsAbortRef = useRef<AbortController | null>(null);
 
+  const postId = postData?.id;
+
   useEffect(() => {
-    setLikeCount(postData?.likes ?? 0);
-    setDislikeCount(postData?.dislikes ?? 0);
-    setViewCount(postData?.views ?? 0);
-    setCommentCount(postData?.comments ?? 0);
     setIsLiked(false);
     setIsDisliked(false);
     setIsReactionPending(false);
@@ -120,10 +118,30 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     setCommentsPage(1);
     setHasMoreComments(false);
     setCommentsError(null);
+    setNewComment("");
+    setFirstName("");
+    setLastName("");
+    setIsAnonymous(false);
     commentsAbortRef.current?.abort();
     commentsAbortRef.current = null;
-    viewRegisteredRef.current = hasViewBeenRecorded(postData?.id);
-  }, [postData]);
+    viewRegisteredRef.current = hasViewBeenRecorded(postId);
+  }, [postId]);
+
+  useEffect(() => {
+    setLikeCount(postData?.likes ?? 0);
+  }, [postData?.likes]);
+
+  useEffect(() => {
+    setDislikeCount(postData?.dislikes ?? 0);
+  }, [postData?.dislikes]);
+
+  useEffect(() => {
+    setViewCount(postData?.views ?? 0);
+  }, [postData?.views]);
+
+  useEffect(() => {
+    setCommentCount(postData?.comments ?? 0);
+  }, [postData?.comments]);
 
   const applyMetrics = useCallback(
     (response?: PostResponse | null, fallback?: { likes?: number; dislikes?: number; views?: number }) => {
@@ -179,17 +197,17 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
         setViewCount(metrics.views);
       }
 
-      if (postData?.id && onPostUpdate && Object.keys(metrics).length > 0) {
-        onPostUpdate(postData.id, metrics);
+      if (postId && onPostUpdate && Object.keys(metrics).length > 0) {
+        onPostUpdate(postId, metrics);
       }
 
       return metrics;
     },
-    [onPostUpdate, postData?.id]
+    [onPostUpdate, postId]
   );
 
   useEffect(() => {
-    if (!postData?.id || viewRegisteredRef.current || isViewPending) {
+    if (!postId || viewRegisteredRef.current || isViewPending) {
       return;
     }
 
@@ -198,9 +216,9 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     setIsViewPending(true);
     setViewCount((value) => value + 1);
 
-    registerPostView(postData.id)
+    registerPostView(postId)
       .then((response) => {
-        markViewRecorded(postData.id);
+        markViewRecorded(postId);
         applyMetrics(response, { views: currentViewCount + 1 });
       })
       .catch(() => {
@@ -210,11 +228,11 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
       .finally(() => {
         setIsViewPending(false);
       });
-  }, [applyMetrics, isViewPending, postData?.id, viewCount]);
+  }, [applyMetrics, isViewPending, postId, viewCount]);
 
   const loadComments = useCallback(
     async ({ page, append = false }: { page: number; append?: boolean }) => {
-      if (!postData?.id) {
+      if (!postId) {
         return;
       }
 
@@ -228,7 +246,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
       }
 
       try {
-        const response = await fetchComments(postData.id, {
+        const response = await fetchComments(postId, {
           page,
           size: COMMENTS_PAGE_SIZE,
           signal: controller.signal,
@@ -277,8 +295,8 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
           return base;
         });
 
-        if (postData.id && onPostUpdate) {
-          onPostUpdate(postData.id, { comments: total });
+        if (postId && onPostUpdate) {
+          onPostUpdate(postId, { comments: total });
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
@@ -300,7 +318,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
         }
       }
     },
-    [onPostUpdate, postData?.id]
+    [onPostUpdate, postId]
   );
 
   useEffect(() => {
@@ -689,7 +707,11 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     setIsSubmittingComment(true);
 
     try {
-      await createComment(postData.id, payload);
+      if (!postId) {
+        throw new Error("Нет идентификатора публикации");
+      }
+
+      await createComment(postId, payload);
 
       toast.success("Комментарий добавлен!");
       setNewComment("");
@@ -698,8 +720,8 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
       setIsAnonymous(false);
       setCommentCount(nextTotal);
 
-      if (onPostUpdate) {
-        onPostUpdate(postData.id, { comments: nextTotal });
+      if (postId && onPostUpdate) {
+        onPostUpdate(postId, { comments: nextTotal });
       }
 
       await loadComments({ page: 1 });
@@ -708,7 +730,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     } finally {
       setIsSubmittingComment(false);
     }
-  }, [commentCount, firstName, isAnonymous, lastName, loadComments, newComment, onPostUpdate, postData?.id]);
+  }, [commentCount, firstName, isAnonymous, lastName, loadComments, newComment, onPostUpdate, postId]);
 
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">

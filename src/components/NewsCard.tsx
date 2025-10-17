@@ -6,7 +6,7 @@ import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { TipTapContent } from "./TipTapContent";
 import {
   clearCommentReaction,
