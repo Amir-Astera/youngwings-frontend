@@ -16,6 +16,21 @@ export interface PostResponse {
   updatedAt: string;
 }
 
+export interface PostListResponse {
+  total: number;
+  page: number;
+  size: number;
+  items: PostResponse[];
+}
+
+export interface PostCountersUpdate {
+  id: string;
+  likeCount?: number;
+  dislikeCount?: number;
+  viewCount?: number;
+  commentCount?: number;
+}
+
 export interface PostSummary {
   id: string;
   title: string;
