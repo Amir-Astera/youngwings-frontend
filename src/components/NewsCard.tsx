@@ -794,7 +794,7 @@ export function NewsCard({
             />
           </div>
         </div>
-      </div>
+      )}
 
       {/* Show Full Button */}
       {!isExpanded && (
