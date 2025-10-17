@@ -5,19 +5,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Textarea } from "./ui/textarea";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner@2.0.3";
+import placeholderImage from "../assets/news-placeholder.svg";
 
 interface NewsCardProps {
-  id: number;
+  id: string;
   title: string;
   excerpt: string;
-  image?: string;
+  image?: string | null;
   category: string;
   date: string;
   likes: number;
+  dislikes: number;
   comments: number;
   views: number;
   isAd?: boolean;
-  onViewPost?: (postData?: any) => void;
+  onViewPost?: () => void;
 }
 
 export function NewsCard({
@@ -27,15 +29,16 @@ export function NewsCard({
   image,
   category,
   date,
-  likes: initialLikes,
+  likes,
+  dislikes,
   comments,
   views,
   onViewPost,
 }: NewsCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
-  const [likeCount, setLikeCount] = useState(initialLikes);
-  const [dislikeCount, setDislikeCount] = useState(Math.floor(initialLikes * 0.1));
+  const [likeCount, setLikeCount] = useState(likes);
+  const [dislikeCount, setDislikeCount] = useState(dislikes);
   const [showComments, setShowComments] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -236,9 +239,9 @@ export function NewsCard({
           </div>
         </div>
 
-        <h3 
+        <h3
           className="mb-3 hover:text-primary transition-colors cursor-pointer font-semibold"
-          onClick={() => onViewPost && onViewPost({ id, title, excerpt, image, category, date, likes: initialLikes, comments, views })}
+          onClick={() => onViewPost?.()}
         >
           {title}
         </h3>
@@ -249,17 +252,15 @@ export function NewsCard({
       </div>
 
       {/* Image */}
-      {image && (
-        <div className="px-5 pb-4">
-          <div className="relative aspect-[16/9] overflow-hidden rounded-xl">
-            <ImageWithFallback
-              src={image}
-              alt={title}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-            />
-          </div>
+      <div className="px-5 pb-4">
+        <div className="relative aspect-[16/9] overflow-hidden rounded-xl">
+          <ImageWithFallback
+            src={image && image.trim() !== "" ? image : placeholderImage}
+            alt={title}
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+          />
         </div>
-      )}
+      </div>
 
       {/* Show Full Button */}
       {!isExpanded && (
