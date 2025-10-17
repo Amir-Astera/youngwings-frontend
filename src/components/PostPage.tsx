@@ -951,6 +951,10 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
                 </div>
               )}
 
+              {!isCommentsLoading && !commentsError && comments.length === 0 && (
+                <div className="text-sm text-muted-foreground">Комментариев пока нет</div>
+              )}
+
               {comments.map((comment) => {
                 const reaction = commentReactions[comment.id] ?? { liked: false, disliked: false };
                 const isPending = reactionPendingByComment[comment.id] === true;

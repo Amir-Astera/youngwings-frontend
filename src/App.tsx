@@ -18,7 +18,6 @@ import { Button } from "./components/ui/button";
 import { fetchAllPosts } from "./lib/api";
 import { formatRelativeTime } from "./lib/dates";
 import type { PostResponse, PostSummary } from "./types/post";
-import defaultThumbnail from "./assets/news-placeholder.svg";
 
 function extractPlainTextFromContent(content?: string): string {
   if (!content) {
@@ -89,7 +88,9 @@ function getDisplayDate(createdAt?: string): string {
 function mapPostResponseToSummary(post: PostResponse): PostSummary {
   const title = (post.title ?? "").trim();
   const excerptSource = (post.description ?? "").trim() || extractPlainTextFromContent(post.content);
-  const image = typeof post.thumbnail === "string" && post.thumbnail.trim() !== "" ? post.thumbnail : defaultThumbnail;
+  const rawThumbnail = typeof post.thumbnail === "string" ? post.thumbnail.trim() : "";
+  const image =
+    rawThumbnail && !/^(нет\s+фотки?|string)$/i.test(rawThumbnail) ? rawThumbnail : undefined;
   const category = (post.chapter ?? "").trim();
   const topic = (post.topic ?? "").trim();
   const author = (post.author ?? "").trim();
