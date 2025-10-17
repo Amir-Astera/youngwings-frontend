@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThumbsUp, ThumbsDown, MessageCircle, Share2, Eye, ArrowLeft, Twitter, Facebook, Link2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -7,21 +7,27 @@ import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner@2.0.3";
+import { TipTapContent } from "./TipTapContent";
+import type { PostSummary, PostResponse } from "../types/post";
+import { clearPostReaction, registerPostView, sendPostDislike, sendPostLike } from "../lib/api";
+import { hasViewBeenRecorded, markViewRecorded } from "../lib/clientState";
 
 interface PostPageProps {
   onBack: () => void;
-  postData?: any;
+  postData?: PostSummary | null;
+  onPostUpdate?: (postId: string, metrics: { likes?: number; dislikes?: number; views?: number }) => void;
 }
 
-export function PostPage({ onBack, postData }: PostPageProps) {
+export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
-  const [likeCount, setLikeCount] = useState(245);
-  const [dislikeCount, setDislikeCount] = useState(24);
+  const [likeCount, setLikeCount] = useState(postData?.likes ?? 0);
+  const [dislikeCount, setDislikeCount] = useState(postData?.dislikes ?? 0);
+  const [viewCount, setViewCount] = useState(postData?.views ?? 0);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -60,6 +66,11 @@ export function PostPage({ onBack, postData }: PostPageProps) {
     },
   ]);
 
+  const [commentCount, setCommentCount] = useState(postData?.comments ?? comments.length);
+  const [isReactionPending, setIsReactionPending] = useState(false);
+  const [isViewPending, setIsViewPending] = useState(false);
+  const viewRegisteredRef = useRef(false);
+
   const [commentReactions, setCommentReactions] = useState<{[key: number]: {liked: boolean, disliked: boolean, likes: number, dislikes: number}}>({
     1: { liked: false, disliked: false, likes: 12, dislikes: 2 },
     2: { liked: false, disliked: false, likes: 8, dislikes: 1 },
@@ -68,33 +79,196 @@ export function PostPage({ onBack, postData }: PostPageProps) {
     5: { liked: false, disliked: false, likes: 9, dislikes: 1 },
   });
 
-  const handleLike = () => {
-    if (isLiked) {
-      setLikeCount(likeCount - 1);
-      setIsLiked(false);
-    } else {
-      if (isDisliked) {
-        setDislikeCount(dislikeCount - 1);
-        setIsDisliked(false);
-      }
-      setLikeCount(likeCount + 1);
-      setIsLiked(true);
-    }
-  };
+  useEffect(() => {
+    setLikeCount(postData?.likes ?? 0);
+    setDislikeCount(postData?.dislikes ?? 0);
+    setViewCount(postData?.views ?? 0);
+    setCommentCount(postData?.comments ?? comments.length);
+    setIsLiked(false);
+    setIsDisliked(false);
+    setIsReactionPending(false);
+    setIsViewPending(false);
+    viewRegisteredRef.current = hasViewBeenRecorded(postData?.id);
+  }, [postData]);
 
-  const handleDislike = () => {
-    if (isDisliked) {
-      setDislikeCount(dislikeCount - 1);
-      setIsDisliked(false);
-    } else {
-      if (isLiked) {
-        setLikeCount(likeCount - 1);
-        setIsLiked(false);
-      }
-      setDislikeCount(dislikeCount + 1);
-      setIsDisliked(true);
+  useEffect(() => {
+    if (!postData?.id || viewRegisteredRef.current || isViewPending) {
+      return;
     }
-  };
+
+    const currentViewCount = viewCount;
+    viewRegisteredRef.current = true;
+    setIsViewPending(true);
+    setViewCount((value) => value + 1);
+
+    registerPostView(postData.id)
+      .then((response) => {
+        markViewRecorded(postData.id);
+        applyMetrics(response, { views: currentViewCount + 1 });
+      })
+      .catch(() => {
+        viewRegisteredRef.current = false;
+        setViewCount(currentViewCount);
+      })
+      .finally(() => {
+        setIsViewPending(false);
+      });
+  }, [applyMetrics, isViewPending, postData?.id]);
+
+  const applyMetrics = useCallback(
+    (response?: PostResponse | null, fallback?: { likes?: number; dislikes?: number; views?: number }) => {
+      const metrics: { likes?: number; dislikes?: number; views?: number } = {};
+
+      const sources = [
+        response
+          ? {
+              likes:
+                typeof response.likeCount === "number" && Number.isFinite(response.likeCount)
+                  ? response.likeCount
+                  : undefined,
+              dislikes:
+                typeof response.dislikeCount === "number" && Number.isFinite(response.dislikeCount)
+                  ? response.dislikeCount
+                  : undefined,
+              views:
+                typeof response.viewCount === "number" && Number.isFinite(response.viewCount)
+                  ? response.viewCount
+                  : undefined,
+            }
+          : undefined,
+        fallback,
+      ];
+
+      for (const source of sources) {
+        if (!source) {
+          continue;
+        }
+
+        if (typeof source.likes === "number" && Number.isFinite(source.likes)) {
+          metrics.likes = source.likes;
+        }
+
+        if (typeof source.dislikes === "number" && Number.isFinite(source.dislikes)) {
+          metrics.dislikes = source.dislikes;
+        }
+
+        if (typeof source.views === "number" && Number.isFinite(source.views)) {
+          metrics.views = source.views;
+        }
+      }
+
+      if (metrics.likes !== undefined) {
+        setLikeCount(metrics.likes);
+      }
+
+      if (metrics.dislikes !== undefined) {
+        setDislikeCount(metrics.dislikes);
+      }
+
+      if (metrics.views !== undefined) {
+        setViewCount(metrics.views);
+      }
+
+      if (postData?.id && onPostUpdate && Object.keys(metrics).length > 0) {
+        onPostUpdate(postData.id, metrics);
+      }
+
+      return metrics;
+    },
+    [onPostUpdate, postData?.id]
+  );
+
+  const handleLike = useCallback(async () => {
+    if (!postData?.id || isReactionPending) {
+      return;
+    }
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isLiked) {
+        const nextLikes = Math.max(0, previous.likeCount - 1);
+        setIsLiked(false);
+        setLikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(postData.id);
+        applyMetrics(response, { likes: nextLikes, dislikes: previous.dislikeCount });
+      } else {
+        setIsLiked(true);
+        setLikeCount((value) => value + 1);
+
+        if (isDisliked) {
+          setIsDisliked(false);
+          setDislikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostLike(postData.id);
+        const nextLikes = previous.likeCount + 1;
+        const nextDislikes = isDisliked ? Math.max(0, previous.dislikeCount - 1) : previous.dislikeCount;
+        applyMetrics(response, { likes: nextLikes, dislikes: nextDislikes });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, postData?.id]);
+
+  const handleDislike = useCallback(async () => {
+    if (!postData?.id || isReactionPending) {
+      return;
+    }
+
+    const previous = {
+      likeCount,
+      dislikeCount,
+      isLiked,
+      isDisliked,
+    };
+
+    setIsReactionPending(true);
+
+    try {
+      if (isDisliked) {
+        const nextDislikes = Math.max(0, previous.dislikeCount - 1);
+        setIsDisliked(false);
+        setDislikeCount((value) => Math.max(0, value - 1));
+        const response = await clearPostReaction(postData.id);
+        applyMetrics(response, { dislikes: nextDislikes, likes: previous.likeCount });
+      } else {
+        setIsDisliked(true);
+        setDislikeCount((value) => value + 1);
+
+        if (isLiked) {
+          setIsLiked(false);
+          setLikeCount((value) => Math.max(0, value - 1));
+        }
+
+        const response = await sendPostDislike(postData.id);
+        const nextDislikes = previous.dislikeCount + 1;
+        const nextLikes = isLiked ? Math.max(0, previous.likeCount - 1) : previous.likeCount;
+        applyMetrics(response, { dislikes: nextDislikes, likes: nextLikes });
+      }
+    } catch (error) {
+      setIsLiked(previous.isLiked);
+      setIsDisliked(previous.isDisliked);
+      setLikeCount(previous.likeCount);
+      setDislikeCount(previous.dislikeCount);
+      toast.error("Не удалось обновить реакцию. Попробуйте ещё раз.");
+    } finally {
+      setIsReactionPending(false);
+    }
+  }, [applyMetrics, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, postData?.id]);
 
   const handleCommentLike = (commentId: number) => {
     setCommentReactions(prev => {
@@ -142,7 +316,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
 
   const handleShare = async (platform: string) => {
     const url = window.location.href;
-    const text = "Искусственный интеллект меняет мир: главные тренды 2025 года";
+    const text = postData?.title || "Публикация YoungWings";
     
     switch (platform) {
       case "whatsapp":
@@ -219,6 +393,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
       ...prev,
       [newCommentObj.id]: { liked: false, disliked: false, likes: 0, dislikes: 0 }
     }));
+    setCommentCount((prev) => prev + 1);
 
     // Clear form
     setNewComment("");
@@ -285,90 +460,14 @@ export function PostPage({ onBack, postData }: PostPageProps) {
 
         {/* Full Content */}
         <div className="px-5 pb-4 space-y-4">
-          <div>
-            <h4 className="mb-2">Введение</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              В современном мире технологии развиваются с невероятной скоростью, и искусственный интеллект становится 
-              неотъемлемой частью нашей повседневной жизни. От умных помощников до автономных транспортных средств — 
-              AI меняет способы взаимодействия людей с окружающим миром.
-            </p>
-          </div>
-
-          <div className="relative aspect-video overflow-hidden rounded-xl">
-            <img
-              src="https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800"
-              alt="AI Technology"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          <div>
-            <h4 className="mb-2">Ключевые тренды 2025 года</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              Эксперты выделяют несколько основных направлений развития технологий в этом году:
-            </p>
-            <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground ml-2">
-              <li>Генеративный AI и большие языковые модели</li>
-              <li>Автоматизация бизнес-процессов с помощью машинного обучения</li>
-              <li>Развитие квантовых вычислений</li>
-              <li>Внедрение 5G и 6G технологий</li>
-            </ul>
-          </div>
-
-          <div className="bg-gray-50 border-l-4 border-blue-600 p-4 rounded-r-lg">
-            <p className="text-sm italic text-gray-700">
-              "Искусственный интеллект — это не просто технология будущего, это инструмент, который уже сегодня 
-              помогает компаниям повышать эффективность и создавать инновационные решения." 
-              <span className="block mt-2 not-italic">— Эксперт по AI технологиям</span>
-            </p>
-          </div>
-
-          <div>
-            <h4 className="mb-2">Практическое применение</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              Казахстанские компании активно внедряют AI-решения в различных сферах. Например, <a href="#" className="text-primary hover:underline">финтех-стартапы</a> используют 
-              машинное обучение для анализа кредитных рисков, а ритейлеры применяют компьютерное зрение для оптимизации 
-              складских операций.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <img
-                src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=400"
-                alt="AI in Business"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <img
-                src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400"
-                alt="Technology Innovation"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-
-          <div>
-            <h4 className="mb-2">Вызовы и перспективы</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Несмотря на очевидные преимущества, внедрение AI-технологий сопряжено с рядом вызовов. Это вопросы 
-              этики, конфиденциальности данных, необходимости переквалификации специалистов и создания соответствующей 
-              инфраструктуры. Однако эксперты уверены, что польза от внедрения искусственного интеллекта значительно 
-              превосходит возможные риски.
-            </p>
-          </div>
-
-          <div className="pt-4 border-t border-gray-200">
-            <p className="text-xs text-muted-foreground mb-2">Читайте также:</p>
-            <div className="space-y-2">
-              <a href="#" className="block text-sm text-primary hover:underline">→ Топ-10 AI-стартапов Казахстана 2025</a>
-              <a href="#" className="block text-sm text-primary hover:underline">→ Как внедрить AI в малый бизнес</a>
-              <a href="#" className="block text-sm text-primary hover:underline">→ Будущее рынка труда в эпоху AI</a>
-            </div>
-          </div>
+          {postData?.content ? (
+            <TipTapContent content={postData.content} className="space-y-4" />
+          ) : (
+            postData?.excerpt ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">{postData.excerpt}</p>
+            ) : null
+          )}
         </div>
-
         {/* Footer */}
         <div className="px-5 pb-5">
           <div className="flex items-center justify-between gap-2">
@@ -377,6 +476,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLike}
+                disabled={isReactionPending}
                 className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                   isLiked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
                 }`}
@@ -388,6 +488,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleDislike}
+                disabled={isReactionPending}
                 className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
                   isDisliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
                 }`}
@@ -402,11 +503,11 @@ export function PostPage({ onBack, postData }: PostPageProps) {
                 className="gap-1 h-8 px-1.5 sm:px-2 hover:text-primary hover:bg-primary/5"
               >
                 <MessageCircle className="w-4 h-4" />
-                <span className="text-sm">56</span>
+                <span className="text-sm">{commentCount}</span>
               </Button>
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Eye className="w-4 h-4" />
-                <span className="text-sm">{formatNumber(1200)}</span>
+                <span className="text-sm">{formatNumber(viewCount)}</span>
               </div>
               <Popover>
                 <PopoverTrigger asChild>
@@ -516,7 +617,7 @@ export function PostPage({ onBack, postData }: PostPageProps) {
         {showComments && (
           <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm">Комментарии ({comments.length})</h4>
+              <h4 className="text-sm">Комментарии ({commentCount})</h4>
               <Button
                 variant="ghost"
                 size="sm"
