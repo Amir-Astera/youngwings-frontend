@@ -6,11 +6,13 @@ import { Textarea } from "./ui/textarea";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner@2.0.3";
 import placeholderImage from "../assets/news-placeholder.svg";
+import { TipTapContent } from "./TipTapContent";
 
 interface NewsCardProps {
   id: string;
   title: string;
   excerpt: string;
+  content?: string | null;
   image?: string | null;
   category: string;
   date: string;
@@ -26,6 +28,7 @@ export function NewsCard({
   id,
   title,
   excerpt,
+  content,
   image,
   category,
   date,
@@ -277,98 +280,17 @@ export function NewsCard({
       {/* Expanded Content */}
       {isExpanded && (
         <div className="px-5 pb-4 space-y-4">
-          <div>
-            <h4 className="mb-2">Введение</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              В современном мире технологии развиваются с невероятной скоростью, и искусственный интеллект становится 
-              неотъемлемой частью нашей повседневной жизни. От умных помощников до автономных транспортных средств — 
-              AI меняет способы взаимодействия людей с окружающим миром.
-            </p>
-          </div>
+          {content ? (
+            <TipTapContent content={content} className="space-y-4" />
+          ) : (
+            <p className="text-sm text-muted-foreground leading-relaxed">{excerpt}</p>
+          )}
 
-          <div className="relative aspect-video overflow-hidden rounded-xl">
-            <img
-              src="https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800"
-              alt="AI Technology"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          <div>
-            <h4 className="mb-2">Ключевые тренды 2025 года</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              Эксперты выделяют несколько основных направлений развития технологий в этом году:
-            </p>
-            <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground ml-2">
-              <li>Генеративный AI и большие языковые модели</li>
-              <li>Автоматизация бизнес-процессов с помощью машинного обучения</li>
-              <li>Развитие квантовых вычислений</li>
-              <li>Внедрение 5G и 6G технологий</li>
-            </ul>
-          </div>
-
-          <div className="bg-gray-50 border-l-4 border-blue-600 p-4 rounded-r-lg">
-            <p className="text-sm italic text-gray-700">
-              "Искусственный интеллект — это не просто технология будущего, это инструмент, который уже сегодня 
-              помогает компаниям повышать эффективность и создавать инновационные решения." 
-              <span className="block mt-2 not-italic">— Эксперт по AI технологиям</span>
-            </p>
-          </div>
-
-          <div>
-            <h4 className="mb-2">Практическое применение</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              Казахстанские компании активно внедряют AI-решения в различных сферах. Например, <a href="#" className="text-primary hover:underline">финтех-стартапы</a> используют 
-              машинное обучение для анализа кредитных рисков, а ритейлеры применяют компьютерное зрение для оптимизации 
-              складских операций.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <img
-                src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=400"
-                alt="AI in Business"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <img
-                src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400"
-                alt="Technology Innovation"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-
-          <div>
-            <h4 className="mb-2">Вызовы и перспективы</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Несмотря на очевидные преимущества, внедрение AI-технологий сопряжено с рядом вы��овов. Это вопросы 
-              этики, конфиденциальности данных, необходимости переквалификации специалистов и создания соответствующей 
-              инфраструктуры. Однако эксперты уверены, что польза от внедрения искусственного интеллекта значительно 
-              превосходит возможные риски.
-            </p>
-          </div>
-
-          <div className="pt-4 border-t border-gray-200">
-            <p className="text-xs text-muted-foreground mb-2">Читайте также:</p>
-            <div className="space-y-2">
-              <a href="#" className="block text-sm text-primary hover:underline">→ Топ-10 AI-стартапов Казахстана 2025</a>
-              <a href="#" className="block text-sm text-primary hover:underline">→ Как внедрить AI в малый бизнес</a>
-              <a href="#" className="block text-sm text-primary hover:underline">→ Будущее рынка труда в эпоху AI</a>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="text-sm text-primary hover:underline"
-          >
+          <button onClick={() => setIsExpanded(false)} className="text-sm text-primary hover:underline">
             Свернуть
           </button>
         </div>
       )}
-
       {/* Footer */}
       <div className="px-5 pb-5">
         <div className="flex items-center justify-between gap-2">
