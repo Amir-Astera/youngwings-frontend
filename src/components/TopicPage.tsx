@@ -1,4 +1,4 @@
-import type { PostSummary } from "../types/post";
+import type { PostCountersState, PostSummary } from "../types/post";
 import { NewsCard } from "./NewsCard";
 
 interface TopicPageProps {
@@ -10,6 +10,7 @@ interface TopicPageProps {
     metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
   ) => void;
   registerVisibility?: (element: HTMLElement | null, postId: string) => void;
+  countersById?: Record<string, PostCountersState>;
 }
 
 function normaliseTopic(value: string) {
@@ -20,7 +21,14 @@ function normaliseTopic(value: string) {
     .trim();
 }
 
-export function TopicPage({ topic, posts, onViewPost, onPostUpdate, registerVisibility }: TopicPageProps) {
+export function TopicPage({
+  topic,
+  posts,
+  onViewPost,
+  onPostUpdate,
+  registerVisibility,
+  countersById,
+}: TopicPageProps) {
   const topicName = topic.replace(/-/g, " ");
   const normalizedTopic = normaliseTopic(topicName);
 
@@ -49,6 +57,10 @@ export function TopicPage({ topic, posts, onViewPost, onPostUpdate, registerVisi
             <NewsCard
               key={post.id}
               {...post}
+              likes={countersById?.[post.id]?.likes ?? post.likes}
+              dislikes={countersById?.[post.id]?.dislikes ?? post.dislikes}
+              comments={countersById?.[post.id]?.comments ?? post.comments}
+              views={countersById?.[post.id]?.views ?? post.views}
               onViewPost={() => onViewPost?.(post)}
               onPostUpdate={onPostUpdate}
               visibilityObserver={registerVisibility}

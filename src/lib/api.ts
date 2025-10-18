@@ -157,7 +157,49 @@ export async function fetchPostCounters(
     return [];
   };
 
-  return normalize(parsed).filter((item) => typeof item.id === "string" && item.id.trim() !== "");
+  return normalize(parsed)
+    .map((item) => {
+      const identifier =
+        typeof item.id === "string" && item.id.trim() !== ""
+          ? item.id.trim()
+          : typeof item.postId === "string" && item.postId.trim() !== ""
+            ? item.postId.trim()
+            : undefined;
+
+      if (!identifier) {
+        return undefined;
+      }
+
+      const likeCount =
+        typeof item.likeCount === "number" && Number.isFinite(item.likeCount)
+          ? item.likeCount
+          : undefined;
+      const dislikeCount =
+        typeof item.dislikeCount === "number" && Number.isFinite(item.dislikeCount)
+          ? item.dislikeCount
+          : undefined;
+      const viewCount =
+        typeof item.viewCount === "number" && Number.isFinite(item.viewCount)
+          ? item.viewCount
+          : undefined;
+      const commentCount =
+        typeof item.commentCount === "number" && Number.isFinite(item.commentCount)
+          ? item.commentCount
+          : undefined;
+
+      return {
+        id: identifier,
+        postId:
+          typeof item.postId === "string" && item.postId.trim() !== ""
+            ? item.postId.trim()
+            : identifier,
+        likeCount,
+        dislikeCount,
+        viewCount,
+        commentCount,
+      } satisfies PostCountersUpdate;
+    })
+    .filter((item): item is PostCountersUpdate => Boolean(item));
 }
 
 export function createPostCountersEventSource(ids: string[]): EventSource {
