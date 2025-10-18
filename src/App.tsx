@@ -452,14 +452,21 @@ export default function App() {
 
     let cancelled = false;
     let eventSource: EventSource | null = null;
+    let messageHandler: ((this: EventSource, event: MessageEvent<string>) => void) | null = null;
     let reconnectTimeout: number | null = null;
     let attempt = 0;
     const controller = new AbortController();
 
     const cleanupEventSource = () => {
       if (eventSource) {
+        if (messageHandler) {
+          eventSource.removeEventListener("message", messageHandler);
+          eventSource.removeEventListener("counters", messageHandler);
+        }
+
         eventSource.close();
         eventSource = null;
+        messageHandler = null;
       }
     };
 
@@ -522,8 +529,12 @@ export default function App() {
         clearReconnectTimeout();
       };
 
-      eventSource.onmessage = (event) => {
-        if (!event.data) {
+      messageHandler = function (this: EventSource, event: MessageEvent<string>) {
+        if (cancelled) {
+          return;
+        }
+
+        if (typeof event.data !== "string" || event.data.trim() === "") {
           return;
         }
 
@@ -534,6 +545,9 @@ export default function App() {
           console.warn("Не удалось обработать обновление счётчиков", error);
         }
       };
+
+      eventSource.addEventListener("message", messageHandler);
+      eventSource.addEventListener("counters", messageHandler);
 
       eventSource.onerror = () => {
         if (cancelled) {
