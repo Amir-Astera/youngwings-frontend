@@ -15,10 +15,23 @@ import { SubsectionPage } from "./components/SubsectionPage";
 import { PostPage } from "./components/PostPage";
 import { Toaster } from "./components/ui/sonner";
 import { Button } from "./components/ui/button";
-import { createPostCountersEventSource, fetchAllPosts, fetchPostCounters } from "./lib/api";
+import {
+  createPostCountersEventSource,
+  fetchAllPosts,
+  fetchPostCounters,
+  fetchPostMyState,
+} from "./lib/api";
 import { formatRelativeTime } from "./lib/dates";
 import { useVisiblePosts } from "./lib/useVisiblePosts";
-import type { PostCountersState, PostCountersUpdate, PostResponse, PostSummary } from "./types/post";
+import type {
+  PostCountersState,
+  PostCountersUpdate,
+  PostMyState,
+  PostPersonalState,
+  PostResponse,
+  PostSummary,
+} from "./types/post";
+import { markViewRecorded } from "./lib/clientState";
 
 function extractPlainTextFromContent(content?: string): string {
   if (!content) {
@@ -113,7 +126,64 @@ function mapPostResponseToSummary(post: PostResponse): PostSummary {
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
     raw: post,
+    myReaction: null,
+    hasViewed: false,
   };
+}
+
+function normalizeReaction(
+  reaction: unknown,
+  liked: unknown,
+  disliked: unknown,
+): PostPersonalState["reaction"] | undefined {
+  if (typeof reaction === "string") {
+    const normalized = reaction.trim().toLowerCase();
+
+    if (normalized === "like") {
+      return "like";
+    }
+
+    if (normalized === "dislike") {
+      return "dislike";
+    }
+
+    if (normalized === "" || normalized === "none" || normalized === "neutral") {
+      return null;
+    }
+  }
+
+  if (reaction === null) {
+    return null;
+  }
+
+  const likedFlag = typeof liked === "boolean" ? liked : undefined;
+  const dislikedFlag = typeof disliked === "boolean" ? disliked : undefined;
+
+  if (likedFlag === true && dislikedFlag !== true) {
+    return "like";
+  }
+
+  if (dislikedFlag === true && likedFlag !== true) {
+    return "dislike";
+  }
+
+  if (likedFlag === false && dislikedFlag === false) {
+    return null;
+  }
+
+  return undefined;
+}
+
+function normalizeViewed(viewed: unknown, hasViewed: unknown): boolean | undefined {
+  if (typeof viewed === "boolean") {
+    return viewed;
+  }
+
+  if (typeof hasViewed === "boolean") {
+    return hasViewed;
+  }
+
+  return undefined;
 }
 
 
@@ -151,6 +221,7 @@ export default function App() {
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [countersById, setCountersById] = useState<Record<string, PostCountersState>>({});
+  const [personalStateById, setPersonalStateById] = useState<Record<string, PostPersonalState>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { register: registerPostVisibility, visibleIds: observedVisibleIds } = useVisiblePosts();
@@ -158,6 +229,7 @@ export default function App() {
   const countersRef = useRef<Record<string, PostCountersState>>({});
   const postsRef = useRef<PostSummary[]>([]);
   const currentPostRef = useRef<PostSummary | null>(null);
+  const personalStateRef = useRef<Record<string, PostPersonalState>>({});
   const pendingCountersRef = useRef<Map<string, PostCountersPatch>>(new Map());
   const flushFrameRef = useRef<number | null>(null);
 
@@ -172,6 +244,10 @@ export default function App() {
   useEffect(() => {
     currentPostRef.current = currentPostData;
   }, [currentPostData]);
+
+  useEffect(() => {
+    personalStateRef.current = personalStateById;
+  }, [personalStateById]);
 
   useEffect(() => {
     return () => {
@@ -239,6 +315,151 @@ export default function App() {
     [],
   );
 
+  const applyPersonalStateUpdates = useCallback(
+    (updates: PostMyState[] | PostMyState | undefined) => {
+      const items = Array.isArray(updates)
+        ? updates.filter((item): item is PostMyState => Boolean(item))
+        : updates
+          ? [updates]
+          : [];
+
+      if (items.length === 0) {
+        return;
+      }
+
+      const patches = new Map<string, PostPersonalState>();
+
+      for (const item of items) {
+        const identifier =
+          typeof item.id === "string" && item.id.trim() !== ""
+            ? item.id.trim()
+            : typeof item.postId === "string" && item.postId.trim() !== ""
+              ? item.postId.trim()
+              : undefined;
+
+        if (!identifier) {
+          continue;
+        }
+
+        const reaction = normalizeReaction(item.myReaction ?? item.reaction, item.liked, item.disliked);
+        const viewed = normalizeViewed(item.viewed, item.hasViewed);
+
+        if (reaction === undefined && viewed === undefined) {
+          continue;
+        }
+
+        const existing = patches.get(identifier) ?? {};
+        const nextPatch: PostPersonalState = { ...existing };
+
+        if (reaction !== undefined) {
+          nextPatch.reaction = reaction;
+        }
+
+        if (viewed !== undefined) {
+          nextPatch.viewed = viewed;
+        }
+
+        patches.set(identifier, nextPatch);
+      }
+
+      if (patches.size === 0) {
+        return;
+      }
+
+      patches.forEach((patch, postId) => {
+        if (patch.viewed) {
+          markViewRecorded(postId);
+        }
+      });
+
+      setPersonalStateById((previous) => {
+        let next = previous;
+        let changed = false;
+
+        patches.forEach((patch, postId) => {
+          const current = previous[postId];
+          const nextState: PostPersonalState = {
+            reaction: patch.reaction !== undefined ? patch.reaction : current?.reaction,
+            viewed: patch.viewed !== undefined ? patch.viewed : current?.viewed,
+          };
+
+          if (
+            !current ||
+            current.reaction !== nextState.reaction ||
+            current.viewed !== nextState.viewed
+          ) {
+            if (!changed) {
+              next = { ...previous };
+              changed = true;
+            }
+
+            next[postId] = nextState;
+          }
+        });
+
+        return changed ? next : previous;
+      });
+
+      setPosts((previousPosts) => {
+        let changed = false;
+
+        const updated = previousPosts.map((item) => {
+          const patch = patches.get(item.id);
+
+          if (!patch) {
+            return item;
+          }
+
+          const nextReaction =
+            patch.reaction !== undefined ? patch.reaction : item.myReaction;
+          const nextViewed = patch.viewed !== undefined ? patch.viewed : item.hasViewed;
+
+          if (nextReaction === item.myReaction && nextViewed === item.hasViewed) {
+            return item;
+          }
+
+          changed = true;
+
+          return {
+            ...item,
+            myReaction: nextReaction ?? null,
+            hasViewed: nextViewed ?? false,
+          } satisfies PostSummary;
+        });
+
+        return changed ? updated : previousPosts;
+      });
+
+      setCurrentPostData((previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        const patch = patches.get(previous.id);
+
+        if (!patch) {
+          return previous;
+        }
+
+        const nextReaction =
+          patch.reaction !== undefined ? patch.reaction : previous.myReaction;
+        const nextViewed =
+          patch.viewed !== undefined ? patch.viewed : previous.hasViewed;
+
+        if (nextReaction === previous.myReaction && nextViewed === previous.hasViewed) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          myReaction: nextReaction ?? null,
+          hasViewed: nextViewed ?? false,
+        } satisfies PostSummary;
+      });
+    },
+    [],
+  );
+
   const fetchPosts = useCallback(
     async ({ signal }: { signal?: AbortSignal } = {}) => {
       setIsLoading(true);
@@ -281,7 +502,20 @@ export default function App() {
           return;
         }
 
-        const normalizedPosts = aggregated.map((item) => mapPostResponseToSummary(item));
+        const normalizedPosts = aggregated.map((item) => {
+          const summary = mapPostResponseToSummary(item);
+          const personal = personalStateRef.current[summary.id];
+
+          if (!personal) {
+            return summary;
+          }
+
+          return {
+            ...summary,
+            myReaction: personal.reaction ?? null,
+            hasViewed: Boolean(personal.viewed),
+          } satisfies PostSummary;
+        });
         normalizedPosts.sort((a, b) => {
           const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -429,7 +663,7 @@ export default function App() {
 
       const counters = countersById[postData.id];
 
-      const enrichedPost = counters
+      const enrichedPost: PostSummary = counters
         ? {
             ...postData,
             likes: counters.likes,
@@ -437,12 +671,19 @@ export default function App() {
             comments: counters.comments,
             views: counters.views,
           }
-        : postData;
+        : { ...postData };
+
+      const personal = personalStateById[postData.id];
+
+      if (personal) {
+        enrichedPost.myReaction = personal.reaction ?? enrichedPost.myReaction ?? null;
+        enrichedPost.hasViewed = personal.viewed ?? enrichedPost.hasViewed ?? false;
+      }
 
       setCurrentPostData(enrichedPost);
       setViewingPost(true);
     },
-    [countersById],
+    [countersById, personalStateById],
   );
 
   const handleBackFromPost = () => {
@@ -578,6 +819,32 @@ export default function App() {
       });
     },
     [resolveNextCounters]
+  );
+
+  const handlePostPersonalStateUpdate = useCallback(
+    (postId: string, patch: PostPersonalState) => {
+      if (
+        !postId ||
+        !patch ||
+        (patch.reaction === undefined && patch.viewed === undefined)
+      ) {
+        return;
+      }
+
+      const payload: PostMyState = { id: postId, postId };
+
+      if (patch.reaction !== undefined) {
+        payload.myReaction = patch.reaction;
+      }
+
+      if (patch.viewed !== undefined) {
+        payload.viewed = patch.viewed;
+        payload.hasViewed = patch.viewed;
+      }
+
+      applyPersonalStateUpdates(payload);
+    },
+    [applyPersonalStateUpdates],
   );
 
   const flushPendingUpdates = useCallback(() => {
@@ -768,6 +1035,22 @@ export default function App() {
       }
 
       try {
+        const personalSnapshot = await fetchPostMyState(ids, controller.signal);
+
+        if (!cancelled && !controller.signal.aborted) {
+          applyPersonalStateUpdates(personalSnapshot);
+        }
+      } catch (error) {
+        if (!(error instanceof Error && error.name === "AbortError")) {
+          console.warn("Не удалось получить пользовательское состояние публикаций", error);
+        }
+      }
+
+      if (cancelled || controller.signal.aborted) {
+        return;
+      }
+
+      try {
         eventSource = createPostCountersEventSource(ids);
       } catch (error) {
         console.warn("Не удалось открыть подписку на счётчики", error);
@@ -820,7 +1103,7 @@ export default function App() {
       cleanupEventSource();
       clearReconnectTimeout();
     };
-  }, [applyCountersUpdates, debouncedVisibleIds]);
+  }, [applyCountersUpdates, applyPersonalStateUpdates, debouncedVisibleIds]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -842,6 +1125,7 @@ export default function App() {
                   onBack={handleBackFromPost}
                   postData={currentPostData}
                   onPostUpdate={handlePostMetricsUpdate}
+                  onPersonalStateUpdate={handlePostPersonalStateUpdate}
                 />
               )}
               
@@ -871,19 +1155,34 @@ export default function App() {
                   {posts.length > 0 && (
                     <>
                       <div className="space-y-3 sm:space-y-5">
-                        {posts.map((item) => (
-                          <NewsCard
-                            key={item.id}
-                            {...item}
-                            likes={countersById[item.id]?.likes ?? item.likes}
-                            dislikes={countersById[item.id]?.dislikes ?? item.dislikes}
-                            comments={countersById[item.id]?.comments ?? item.comments}
-                            views={countersById[item.id]?.views ?? item.views}
-                            onViewPost={() => handleViewPost(item)}
-                            onPostUpdate={handlePostMetricsUpdate}
-                            visibilityObserver={registerPostVisibility}
-                          />
-                        ))}
+                        {posts.map((item) => {
+                          const personal = personalStateById[item.id];
+                          const reaction =
+                            personal && personal.reaction !== undefined
+                              ? personal.reaction
+                              : item.myReaction ?? null;
+                          const viewed =
+                            personal && personal.viewed !== undefined
+                              ? personal.viewed
+                              : item.hasViewed ?? false;
+
+                          return (
+                            <NewsCard
+                              key={item.id}
+                              {...item}
+                              likes={countersById[item.id]?.likes ?? item.likes}
+                              dislikes={countersById[item.id]?.dislikes ?? item.dislikes}
+                              comments={countersById[item.id]?.comments ?? item.comments}
+                              views={countersById[item.id]?.views ?? item.views}
+                              myReaction={reaction}
+                              hasViewed={viewed}
+                              onViewPost={() => handleViewPost(item)}
+                              onPostUpdate={handlePostMetricsUpdate}
+                              onPersonalStateUpdate={handlePostPersonalStateUpdate}
+                              visibilityObserver={registerPostVisibility}
+                            />
+                          );
+                        })}
                       </div>
 
                       {/* Infinite scroll indicator */}
@@ -937,6 +1236,7 @@ export default function App() {
                     countersById={countersById}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
+                    onPersonalStateUpdate={handlePostPersonalStateUpdate}
                     registerVisibility={registerPostVisibility}
                   />
                 );
@@ -947,6 +1247,7 @@ export default function App() {
                   onBack={handleBackFromPost}
                   postData={currentPostData}
                   onPostUpdate={handlePostMetricsUpdate}
+                  onPersonalStateUpdate={handlePostPersonalStateUpdate}
                 />
               )}
 
@@ -987,6 +1288,7 @@ export default function App() {
                     countersById={countersById}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
+                    onPersonalStateUpdate={handlePostPersonalStateUpdate}
                     registerVisibility={registerPostVisibility}
                   />
                 );
@@ -996,6 +1298,7 @@ export default function App() {
                   onBack={handleBackFromPost}
                   postData={currentPostData}
                   onPostUpdate={handlePostMetricsUpdate}
+                  onPersonalStateUpdate={handlePostPersonalStateUpdate}
                 />
               )}
             </div>
