@@ -1,4 +1,4 @@
-import type { PostCountersState, PostSummary } from "../types/post";
+import type { PostCountersState, PostPersonalState, PostSummary } from "../types/post";
 import { NewsCard } from "./NewsCard";
 
 interface TopicPageProps {
@@ -11,6 +11,7 @@ interface TopicPageProps {
   ) => void;
   registerVisibility?: (element: HTMLElement | null, postId: string) => void;
   countersById?: Record<string, PostCountersState>;
+  onPersonalStateUpdate?: (postId: string, patch: PostPersonalState) => void;
 }
 
 function normaliseTopic(value: string) {
@@ -28,6 +29,7 @@ export function TopicPage({
   onPostUpdate,
   registerVisibility,
   countersById,
+  onPersonalStateUpdate,
 }: TopicPageProps) {
   const topicName = topic.replace(/-/g, " ");
   const normalizedTopic = normaliseTopic(topicName);
@@ -61,8 +63,11 @@ export function TopicPage({
               dislikes={countersById?.[post.id]?.dislikes ?? post.dislikes}
               comments={countersById?.[post.id]?.comments ?? post.comments}
               views={countersById?.[post.id]?.views ?? post.views}
+              myReaction={post.myReaction ?? null}
+              hasViewed={post.hasViewed ?? false}
               onViewPost={() => onViewPost?.(post)}
               onPostUpdate={onPostUpdate}
+              onPersonalStateUpdate={onPersonalStateUpdate}
               visibilityObserver={registerVisibility}
             />
           ))

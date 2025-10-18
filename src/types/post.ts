@@ -39,6 +39,24 @@ export interface PostCountersState {
   comments: number;
 }
 
+export type PostReactionType = "like" | "dislike";
+
+export interface PostMyState {
+  id?: string;
+  postId?: string;
+  myReaction?: PostReactionType | null;
+  reaction?: PostReactionType | null;
+  liked?: boolean;
+  disliked?: boolean;
+  viewed?: boolean;
+  hasViewed?: boolean;
+}
+
+export interface PostPersonalState {
+  reaction?: PostReactionType | null;
+  viewed?: boolean;
+}
+
 export interface PostSummary {
   id: string;
   title: string;
@@ -56,4 +74,6 @@ export interface PostSummary {
   createdAt?: string;
   updatedAt?: string;
   raw?: PostResponse;
+  myReaction?: PostReactionType | null;
+  hasViewed?: boolean;
 }

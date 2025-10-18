@@ -18,7 +18,7 @@ import { Checkbox } from "./ui/checkbox";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner";
 import { TipTapContent } from "./TipTapContent";
-import type { PostSummary, PostResponse } from "../types/post";
+import type { PostPersonalState, PostSummary, PostResponse } from "../types/post";
 import type { CommentResponse } from "../types/comment";
 import {
   clearCommentReaction,
@@ -41,6 +41,7 @@ interface PostPageProps {
     postId: string,
     metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
   ) => void;
+  onPersonalStateUpdate?: (postId: string, patch: PostPersonalState) => void;
 }
 
 const COMMENTS_PAGE_SIZE = 20;
@@ -75,13 +76,13 @@ function getCommentAuthor(name?: string | null): string {
   return name?.trim() || "Аноним";
 }
 
-export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
+export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate }: PostPageProps) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const [isLiked, setIsLiked] = useState(false);
-  const [isDisliked, setIsDisliked] = useState(false);
+  const [isLiked, setIsLiked] = useState(() => postData?.myReaction === "like");
+  const [isDisliked, setIsDisliked] = useState(() => postData?.myReaction === "dislike");
   const [likeCount, setLikeCount] = useState(postData?.likes ?? 0);
   const [dislikeCount, setDislikeCount] = useState(postData?.dislikes ?? 0);
   const [viewCount, setViewCount] = useState(postData?.views ?? 0);
@@ -107,8 +108,11 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
   const postId = postData?.id;
 
   useEffect(() => {
-    setIsLiked(false);
-    setIsDisliked(false);
+    const initialReaction = postData?.myReaction;
+    const initialHasViewed = postData?.hasViewed;
+
+    setIsLiked(initialReaction === "like");
+    setIsDisliked(initialReaction === "dislike");
     setIsReactionPending(false);
     setIsViewPending(false);
     setShowComments(false);
@@ -124,7 +128,13 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     setIsAnonymous(false);
     commentsAbortRef.current?.abort();
     commentsAbortRef.current = null;
-    viewRegisteredRef.current = hasViewBeenRecorded(postId);
+    const alreadyViewed = hasViewBeenRecorded(postId) || Boolean(initialHasViewed);
+
+    if (alreadyViewed && postId) {
+      markViewRecorded(postId);
+    }
+
+    viewRegisteredRef.current = alreadyViewed;
   }, [postId]);
 
   useEffect(() => {
@@ -136,12 +146,30 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
   }, [postData?.dislikes]);
 
   useEffect(() => {
+    if (postData?.myReaction === undefined) {
+      return;
+    }
+
+    setIsLiked(postData.myReaction === "like");
+    setIsDisliked(postData.myReaction === "dislike");
+  }, [postData?.myReaction]);
+
+  useEffect(() => {
     setViewCount(postData?.views ?? 0);
   }, [postData?.views]);
 
   useEffect(() => {
     setCommentCount(postData?.comments ?? 0);
   }, [postData?.comments]);
+
+  useEffect(() => {
+    if (!postId || !postData?.hasViewed) {
+      return;
+    }
+
+    markViewRecorded(postId);
+    viewRegisteredRef.current = true;
+  }, [postData?.hasViewed, postId]);
 
   const applyMetrics = useCallback(
     (response?: PostResponse | null, fallback?: { likes?: number; dislikes?: number; views?: number }) => {
@@ -219,6 +247,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     registerPostView(postId)
       .then((response) => {
         markViewRecorded(postId);
+        onPersonalStateUpdate?.(postId, { viewed: true });
         applyMetrics(response, { views: currentViewCount + 1 });
       })
       .catch(() => {
@@ -228,7 +257,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
       .finally(() => {
         setIsViewPending(false);
       });
-  }, [applyMetrics, isViewPending, postId, viewCount]);
+  }, [applyMetrics, isViewPending, onPersonalStateUpdate, postId, viewCount]);
 
   const loadComments = useCallback(
     async ({ page, append = false }: { page: number; append?: boolean }) => {
@@ -412,6 +441,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
         setLikeCount((value) => Math.max(0, value - 1));
         const response = await clearPostReaction(postData.id);
         applyMetrics(response, { likes: nextLikes, dislikes: previous.dislikeCount });
+        onPersonalStateUpdate?.(postData.id, { reaction: null });
       } else {
         setIsLiked(true);
         setLikeCount((value) => value + 1);
@@ -425,6 +455,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
         const nextLikes = previous.likeCount + 1;
         const nextDislikes = isDisliked ? Math.max(0, previous.dislikeCount - 1) : previous.dislikeCount;
         applyMetrics(response, { likes: nextLikes, dislikes: nextDislikes });
+        onPersonalStateUpdate?.(postData.id, { reaction: "like" });
       }
     } catch (error) {
       setIsLiked(previous.isLiked);
@@ -435,7 +466,16 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     } finally {
       setIsReactionPending(false);
     }
-  }, [applyMetrics, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, postData?.id]);
+  }, [
+    applyMetrics,
+    isDisliked,
+    isLiked,
+    isReactionPending,
+    likeCount,
+    dislikeCount,
+    onPersonalStateUpdate,
+    postData?.id,
+  ]);
 
   const handleDislike = useCallback(async () => {
     if (!postData?.id || isReactionPending) {
@@ -458,6 +498,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
         setDislikeCount((value) => Math.max(0, value - 1));
         const response = await clearPostReaction(postData.id);
         applyMetrics(response, { dislikes: nextDislikes, likes: previous.likeCount });
+        onPersonalStateUpdate?.(postData.id, { reaction: null });
       } else {
         setIsDisliked(true);
         setDislikeCount((value) => value + 1);
@@ -471,6 +512,7 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
         const nextDislikes = previous.dislikeCount + 1;
         const nextLikes = isLiked ? Math.max(0, previous.likeCount - 1) : previous.likeCount;
         applyMetrics(response, { dislikes: nextDislikes, likes: nextLikes });
+        onPersonalStateUpdate?.(postData.id, { reaction: "dislike" });
       }
     } catch (error) {
       setIsLiked(previous.isLiked);
@@ -481,7 +523,16 @@ export function PostPage({ onBack, postData, onPostUpdate }: PostPageProps) {
     } finally {
       setIsReactionPending(false);
     }
-  }, [applyMetrics, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, postData?.id]);
+  }, [
+    applyMetrics,
+    isDisliked,
+    isLiked,
+    isReactionPending,
+    likeCount,
+    dislikeCount,
+    onPersonalStateUpdate,
+    postData?.id,
+  ]);
 
   const handleCommentLike = useCallback(
     async (commentId: string) => {

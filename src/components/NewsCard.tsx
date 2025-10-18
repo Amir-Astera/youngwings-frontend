@@ -21,7 +21,7 @@ import {
 } from "../lib/api";
 import { formatRelativeTime } from "../lib/dates";
 import { hasViewBeenRecorded, markViewRecorded } from "../lib/clientState";
-import type { PostResponse } from "../types/post";
+import type { PostPersonalState, PostReactionType, PostResponse } from "../types/post";
 import type { CommentResponse } from "../types/comment";
 
 interface NewsCardProps {
@@ -42,6 +42,9 @@ interface NewsCardProps {
     postId: string,
     metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
   ) => void;
+  myReaction?: PostReactionType | null;
+  hasViewed?: boolean;
+  onPersonalStateUpdate?: (postId: string, patch: PostPersonalState) => void;
   visibilityObserver?: (element: HTMLElement | null, postId: string) => void;
 }
 
@@ -91,10 +94,13 @@ export function NewsCard({
   views,
   onViewPost,
   onPostUpdate,
+  myReaction,
+  hasViewed,
+  onPersonalStateUpdate,
   visibilityObserver,
 }: NewsCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
-  const [isDisliked, setIsDisliked] = useState(false);
+  const [isLiked, setIsLiked] = useState(() => myReaction === "like");
+  const [isDisliked, setIsDisliked] = useState(() => myReaction === "dislike");
   const [likeCount, setLikeCount] = useState(likes);
   const [dislikeCount, setDislikeCount] = useState(dislikes);
   const [viewCount, setViewCount] = useState(views);
@@ -115,7 +121,9 @@ export function NewsCard({
   const [commentsList, setCommentsList] = useState<CommentResponse[]>([]);
   const [commentReactions, setCommentReactions] = useState<Record<string, { liked: boolean; disliked: boolean }>>({});
   const [reactionPendingByComment, setReactionPendingByComment] = useState<Record<string, boolean>>({});
-  const [hasRegisteredView, setHasRegisteredView] = useState(() => hasViewBeenRecorded(id));
+  const [hasRegisteredView, setHasRegisteredView] = useState(
+    () => Boolean(hasViewed) || hasViewBeenRecorded(id),
+  );
   const commentsAbortRef = useRef<AbortController | null>(null);
   const cardRef = useRef<HTMLElement | null>(null);
 
@@ -231,6 +239,7 @@ export function NewsCard({
         setLikeCount((value) => Math.max(0, value - 1));
         const response = await clearPostReaction(id);
         applyMetrics(response, { likes: nextLikes, dislikes: previous.dislikeCount });
+        onPersonalStateUpdate?.(id, { reaction: null });
       } else {
         setIsLiked(true);
         setLikeCount((value) => value + 1);
@@ -247,6 +256,7 @@ export function NewsCard({
           likes: nextLikes,
           dislikes: nextDislikes,
         });
+        onPersonalStateUpdate?.(id, { reaction: "like" });
       }
     } catch (error) {
       setIsLiked(previous.isLiked);
@@ -257,7 +267,7 @@ export function NewsCard({
     } finally {
       setIsReactionPending(false);
     }
-  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount]);
+  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, onPersonalStateUpdate]);
 
   const handleDislike = useCallback(async () => {
     if (isReactionPending) {
@@ -280,6 +290,7 @@ export function NewsCard({
         setDislikeCount((value) => Math.max(0, value - 1));
         const response = await clearPostReaction(id);
         applyMetrics(response, { dislikes: nextDislikes, likes: previous.likeCount });
+        onPersonalStateUpdate?.(id, { reaction: null });
       } else {
         setIsDisliked(true);
         setDislikeCount((value) => value + 1);
@@ -296,6 +307,7 @@ export function NewsCard({
           dislikes: nextDislikes,
           likes: nextLikes,
         });
+        onPersonalStateUpdate?.(id, { reaction: "dislike" });
       }
     } catch (error) {
       setIsLiked(previous.isLiked);
@@ -306,11 +318,9 @@ export function NewsCard({
     } finally {
       setIsReactionPending(false);
     }
-  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount]);
+  }, [applyMetrics, id, isDisliked, isLiked, isReactionPending, likeCount, dislikeCount, onPersonalStateUpdate]);
 
-  const handleExpand = useCallback(() => {
-    setIsExpanded(true);
-
+  const registerViewIfNeeded = useCallback(() => {
     if (hasRegisteredView || isViewPending) {
       return;
     }
@@ -323,6 +333,7 @@ export function NewsCard({
       .then((response) => {
         markViewRecorded(id);
         setHasRegisteredView(true);
+        onPersonalStateUpdate?.(id, { viewed: true });
         applyMetrics(response, { views: previous + 1 });
       })
       .catch(() => {
@@ -332,7 +343,12 @@ export function NewsCard({
       .finally(() => {
         setIsViewPending(false);
       });
-  }, [applyMetrics, hasRegisteredView, id, isViewPending, viewCount]);
+  }, [applyMetrics, hasRegisteredView, id, isViewPending, onPersonalStateUpdate, viewCount]);
+
+  const handleExpand = useCallback(() => {
+    setIsExpanded(true);
+    registerViewIfNeeded();
+  }, [registerViewIfNeeded]);
 
   useEffect(() => {
     setLikeCount(likes);
@@ -349,6 +365,24 @@ export function NewsCard({
   useEffect(() => {
     setCommentCount(initialComments);
   }, [initialComments]);
+
+  useEffect(() => {
+    if (myReaction === undefined) {
+      return;
+    }
+
+    setIsLiked(myReaction === "like");
+    setIsDisliked(myReaction === "dislike");
+  }, [id, myReaction]);
+
+  useEffect(() => {
+    if (!hasViewed) {
+      return;
+    }
+
+    markViewRecorded(id);
+    setHasRegisteredView(true);
+  }, [hasViewed, id]);
 
   useEffect(() => {
     setHasRegisteredView(hasViewBeenRecorded(id));
@@ -793,7 +827,10 @@ export function NewsCard({
 
         <h3
           className="mb-3 hover:text-primary transition-colors cursor-pointer font-semibold"
-          onClick={() => onViewPost?.()}
+          onClick={() => {
+            registerViewIfNeeded();
+            onViewPost?.();
+          }}
         >
           {title}
         </h3>

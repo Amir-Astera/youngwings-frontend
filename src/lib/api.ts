@@ -1,10 +1,11 @@
 import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
-import type { PostCountersUpdate, PostListResponse, PostResponse } from "../types/post";
+import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } from "../types/post";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
 const POST_COUNTERS_ENDPOINT = "/api/post/counters";
 const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/live";
+const POST_MY_STATE_ENDPOINT = "/api/post/my-state";
 const CSRF_COOKIE_NAME = "yw_csrf";
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -215,6 +216,122 @@ export function createPostCountersEventSource(ids: string[]): EventSource {
   const url = `${POST_COUNTERS_STREAM_ENDPOINT}?${params.toString()}`;
 
   return new EventSource(buildUrl(url), { withCredentials: true });
+}
+
+export async function fetchPostMyState(
+  ids: string[],
+  signal?: AbortSignal,
+): Promise<PostMyState[]> {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return [];
+  }
+
+  const sanitizedIds = ids
+    .filter((id) => typeof id === "string" && id.trim() !== "")
+    .map((id) => id.trim());
+
+  if (sanitizedIds.length === 0) {
+    return [];
+  }
+
+  const params = new URLSearchParams({ ids: sanitizedIds.join(",") });
+
+  const response = await apiRequest(`${POST_MY_STATE_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить пользовательское состояние публикаций");
+  }
+
+  const parsed = await parseJsonResponse<PostMyState[] | PostMyState>(response);
+
+  const normalize = (value: unknown): PostMyState[] => {
+    if (Array.isArray(value)) {
+      return value.filter((item): item is PostMyState => typeof item === "object" && item !== null);
+    }
+
+    if (value && typeof value === "object") {
+      return [value as PostMyState];
+    }
+
+    return [];
+  };
+
+  return normalize(parsed)
+    .map((item) => {
+      const identifier =
+        typeof item.id === "string" && item.id.trim() !== ""
+          ? item.id.trim()
+          : typeof item.postId === "string" && item.postId.trim() !== ""
+            ? item.postId.trim()
+            : undefined;
+
+      if (!identifier) {
+        return undefined;
+      }
+
+      const result: PostMyState = {
+        id: identifier,
+        postId:
+          typeof item.postId === "string" && item.postId.trim() !== ""
+            ? item.postId.trim()
+            : identifier,
+      };
+
+      const rawReaction =
+        item.myReaction !== undefined ? item.myReaction : (item.reaction as PostMyState["myReaction"]);
+
+      let normalizedReaction: PostMyState["myReaction"] | undefined;
+
+      if (typeof rawReaction === "string") {
+        const lowered = rawReaction.trim().toLowerCase();
+
+        if (lowered === "like") {
+          normalizedReaction = "like";
+        } else if (lowered === "dislike") {
+          normalizedReaction = "dislike";
+        } else if (lowered === "" || lowered === "none" || lowered === "neutral") {
+          normalizedReaction = null;
+        }
+      } else if (rawReaction === null) {
+        normalizedReaction = null;
+      }
+
+      if (normalizedReaction === undefined) {
+        const likedFlag = typeof item.liked === "boolean" ? item.liked : undefined;
+        const dislikedFlag = typeof item.disliked === "boolean" ? item.disliked : undefined;
+
+        if (likedFlag === true && dislikedFlag !== true) {
+          normalizedReaction = "like";
+        } else if (dislikedFlag === true && likedFlag !== true) {
+          normalizedReaction = "dislike";
+        } else if (likedFlag === false && dislikedFlag === false) {
+          normalizedReaction = null;
+        }
+      }
+
+      if (normalizedReaction !== undefined) {
+        result.myReaction = normalizedReaction;
+        result.reaction = normalizedReaction;
+      }
+
+      const viewedValue =
+        typeof item.viewed === "boolean"
+          ? item.viewed
+          : typeof item.hasViewed === "boolean"
+            ? item.hasViewed
+            : undefined;
+
+      if (viewedValue !== undefined) {
+        result.viewed = viewedValue;
+        result.hasViewed = viewedValue;
+      }
+
+      return result;
+    })
+    .filter((item): item is PostMyState => Boolean(item));
 }
 
 async function sendReactionRequest(
