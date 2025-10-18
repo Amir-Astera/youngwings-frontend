@@ -1,4 +1,4 @@
-import type { PostSummary } from "../types/post";
+import type { PostCountersState, PostSummary } from "../types/post";
 import { NewsCard } from "./NewsCard";
 
 interface SubsectionPageProps {
@@ -11,6 +11,7 @@ interface SubsectionPageProps {
     metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
   ) => void;
   registerVisibility?: (element: HTMLElement | null, postId: string) => void;
+  countersById?: Record<string, PostCountersState>;
 }
 
 export function SubsectionPage({
@@ -20,6 +21,7 @@ export function SubsectionPage({
   onViewPost,
   onPostUpdate,
   registerVisibility,
+  countersById,
 }: SubsectionPageProps) {
   const news = posts;
 
@@ -38,6 +40,10 @@ export function SubsectionPage({
             <NewsCard
               key={item.id}
               {...item}
+              likes={countersById?.[item.id]?.likes ?? item.likes}
+              dislikes={countersById?.[item.id]?.dislikes ?? item.dislikes}
+              comments={countersById?.[item.id]?.comments ?? item.comments}
+              views={countersById?.[item.id]?.views ?? item.views}
               onViewPost={() => onViewPost?.(item)}
               onPostUpdate={onPostUpdate}
               visibilityObserver={registerVisibility}

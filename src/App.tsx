@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MobileMenu } from "./components/MobileMenu";
@@ -18,7 +18,7 @@ import { Button } from "./components/ui/button";
 import { createPostCountersEventSource, fetchAllPosts, fetchPostCounters } from "./lib/api";
 import { formatRelativeTime } from "./lib/dates";
 import { useVisiblePosts } from "./lib/useVisiblePosts";
-import type { PostCountersUpdate, PostResponse, PostSummary } from "./types/post";
+import type { PostCountersState, PostCountersUpdate, PostResponse, PostSummary } from "./types/post";
 
 function extractPlainTextFromContent(content?: string): string {
   if (!content) {
@@ -138,15 +138,52 @@ function getSubsectionDescription(subsection: string): string {
 const POSTS_PAGE_SIZE = 20;
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000];
 
+type PostCountersPatch = {
+  likes?: number;
+  dislikes?: number;
+  views?: number;
+  comments?: number;
+};
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [viewingPost, setViewingPost] = useState(false);
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [countersById, setCountersById] = useState<Record<string, PostCountersState>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { register: registerPostVisibility, visibleIds: observedVisibleIds } = useVisiblePosts();
   const [debouncedVisibleIds, setDebouncedVisibleIds] = useState<string[]>([]);
+  const countersRef = useRef<Record<string, PostCountersState>>({});
+  const postsRef = useRef<PostSummary[]>([]);
+  const currentPostRef = useRef<PostSummary | null>(null);
+  const pendingCountersRef = useRef<Map<string, PostCountersPatch>>(new Map());
+  const flushFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    countersRef.current = countersById;
+  }, [countersById]);
+
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
+
+  useEffect(() => {
+    currentPostRef.current = currentPostData;
+  }, [currentPostData]);
+
+  useEffect(() => {
+    return () => {
+      pendingCountersRef.current.clear();
+
+      if (flushFrameRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(flushFrameRef.current);
+      }
+
+      flushFrameRef.current = null;
+    };
+  }, []);
 
   const sortedVisibleIds = useMemo(() => {
     if (!posts.length || observedVisibleIds.length === 0) {
@@ -172,6 +209,35 @@ export default function App() {
 
     return [];
   }, [currentPage, currentPostData, sortedVisibleIds, viewingPost]);
+
+  const resolveNextCounters = useCallback(
+    (postId: string, metrics: PostCountersPatch): PostCountersState => {
+      const previousCounters = countersRef.current[postId];
+      const fallbackSummary =
+        postsRef.current.find((item) => item.id === postId) ??
+        (currentPostRef.current && currentPostRef.current.id === postId
+          ? currentPostRef.current
+          : null);
+
+      const base: PostCountersState = previousCounters ?? {
+        likes: fallbackSummary?.likes ?? 0,
+        dislikes: fallbackSummary?.dislikes ?? 0,
+        comments: fallbackSummary?.comments ?? 0,
+        views: fallbackSummary?.views ?? 0,
+      };
+
+      const nextValue = (value?: number, fallback?: number) =>
+        typeof value === "number" && Number.isFinite(value) ? value : fallback ?? 0;
+
+      return {
+        likes: nextValue(metrics.likes, base.likes),
+        dislikes: nextValue(metrics.dislikes, base.dislikes),
+        comments: nextValue(metrics.comments, base.comments),
+        views: nextValue(metrics.views, base.views),
+      };
+    },
+    [],
+  );
 
   const fetchPosts = useCallback(
     async ({ signal }: { signal?: AbortSignal } = {}) => {
@@ -223,6 +289,42 @@ export default function App() {
         });
 
         setPosts(normalizedPosts);
+        setCountersById((previous) => {
+          let next = previous;
+          let changed = false;
+
+          for (const item of normalizedPosts) {
+            const counters: PostCountersState = {
+              likes:
+                typeof item.likes === "number" && Number.isFinite(item.likes) ? item.likes : 0,
+              dislikes:
+                typeof item.dislikes === "number" && Number.isFinite(item.dislikes) ? item.dislikes : 0,
+              comments:
+                typeof item.comments === "number" && Number.isFinite(item.comments) ? item.comments : 0,
+              views:
+                typeof item.views === "number" && Number.isFinite(item.views) ? item.views : 0,
+            };
+
+            const current = previous[item.id];
+
+            if (
+              !current ||
+              current.likes !== counters.likes ||
+              current.dislikes !== counters.dislikes ||
+              current.comments !== counters.comments ||
+              current.views !== counters.views
+            ) {
+              if (!changed) {
+                next = { ...previous };
+                changed = true;
+              }
+
+              next[item.id] = counters;
+            }
+          }
+
+          return changed ? next : previous;
+        });
         setCurrentPostData((previous) => {
           if (!previous) {
             return previous;
@@ -319,14 +421,29 @@ export default function App() {
     setCurrentPostData(null);
   }, [currentPage]);
 
-  const handleViewPost = (postData?: PostSummary) => {
-    if (!postData) {
-      return;
-    }
+  const handleViewPost = useCallback(
+    (postData?: PostSummary) => {
+      if (!postData) {
+        return;
+      }
 
-    setCurrentPostData(postData);
-    setViewingPost(true);
-  };
+      const counters = countersById[postData.id];
+
+      const enrichedPost = counters
+        ? {
+            ...postData,
+            likes: counters.likes,
+            dislikes: counters.dislikes,
+            comments: counters.comments,
+            views: counters.views,
+          }
+        : postData;
+
+      setCurrentPostData(enrichedPost);
+      setViewingPost(true);
+    },
+    [countersById],
+  );
 
   const handleBackFromPost = () => {
     setViewingPost(false);
@@ -340,64 +457,166 @@ export default function App() {
   };
 
   const handlePostMetricsUpdate = useCallback(
-    (
-      postId: string,
-      metrics: { likes?: number; dislikes?: number; views?: number; comments?: number }
-    ) => {
-      setPosts((previousPosts) =>
-        previousPosts.map((item) => {
+    (postId: string, metrics: PostCountersPatch) => {
+      if (
+        !postId ||
+        (metrics.likes === undefined &&
+          metrics.dislikes === undefined &&
+          metrics.views === undefined &&
+          metrics.comments === undefined)
+      ) {
+        return;
+      }
+
+      const nextCounters = resolveNextCounters(postId, metrics);
+
+      setCountersById((previous) => {
+        const current = previous[postId];
+
+        if (
+          current &&
+          current.likes === nextCounters.likes &&
+          current.dislikes === nextCounters.dislikes &&
+          current.comments === nextCounters.comments &&
+          current.views === nextCounters.views
+        ) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          [postId]: nextCounters,
+        };
+      });
+
+      setPosts((previousPosts) => {
+        let changed = false;
+
+        const updated = previousPosts.map((item) => {
           if (item.id !== postId) {
             return item;
           }
 
+          const isUnchanged =
+            item.likes === nextCounters.likes &&
+            item.dislikes === nextCounters.dislikes &&
+            item.comments === nextCounters.comments &&
+            item.views === nextCounters.views &&
+            (!item.raw ||
+              (item.raw.likeCount === nextCounters.likes &&
+                item.raw.dislikeCount === nextCounters.dislikes &&
+                item.raw.commentCount === nextCounters.comments &&
+                item.raw.viewCount === nextCounters.views));
+
+          if (isUnchanged) {
+            return item;
+          }
+
+          changed = true;
+
           const updatedRaw = item.raw
             ? {
                 ...item.raw,
-                likeCount: metrics.likes ?? item.raw.likeCount,
-                dislikeCount: metrics.dislikes ?? item.raw.dislikeCount,
-                viewCount: metrics.views ?? item.raw.viewCount,
-                commentCount: metrics.comments ?? item.raw.commentCount,
+                likeCount: nextCounters.likes,
+                dislikeCount: nextCounters.dislikes,
+                commentCount: nextCounters.comments,
+                viewCount: nextCounters.views,
               }
             : item.raw;
 
           return {
             ...item,
-            likes: metrics.likes ?? item.likes,
-            dislikes: metrics.dislikes ?? item.dislikes,
-            views: metrics.views ?? item.views,
-            comments: metrics.comments ?? item.comments,
+            likes: nextCounters.likes,
+            dislikes: nextCounters.dislikes,
+            comments: nextCounters.comments,
+            views: nextCounters.views,
             raw: updatedRaw,
           };
-        })
-      );
+        });
+
+        return changed ? updated : previousPosts;
+      });
 
       setCurrentPostData((previous) => {
         if (!previous || previous.id !== postId) {
           return previous;
         }
 
+        const isUnchanged =
+          previous.likes === nextCounters.likes &&
+          previous.dislikes === nextCounters.dislikes &&
+          previous.comments === nextCounters.comments &&
+          previous.views === nextCounters.views &&
+          (!previous.raw ||
+            (previous.raw.likeCount === nextCounters.likes &&
+              previous.raw.dislikeCount === nextCounters.dislikes &&
+              previous.raw.commentCount === nextCounters.comments &&
+              previous.raw.viewCount === nextCounters.views));
+
+        if (isUnchanged) {
+          return previous;
+        }
+
         const updatedRaw = previous.raw
           ? {
               ...previous.raw,
-              likeCount: metrics.likes ?? previous.raw.likeCount,
-              dislikeCount: metrics.dislikes ?? previous.raw.dislikeCount,
-              viewCount: metrics.views ?? previous.raw.viewCount,
-              commentCount: metrics.comments ?? previous.raw.commentCount,
+              likeCount: nextCounters.likes,
+              dislikeCount: nextCounters.dislikes,
+              commentCount: nextCounters.comments,
+              viewCount: nextCounters.views,
             }
           : previous.raw;
 
         return {
           ...previous,
-          likes: metrics.likes ?? previous.likes,
-          dislikes: metrics.dislikes ?? previous.dislikes,
-          views: metrics.views ?? previous.views,
-          comments: metrics.comments ?? previous.comments,
+          likes: nextCounters.likes,
+          dislikes: nextCounters.dislikes,
+          comments: nextCounters.comments,
+          views: nextCounters.views,
           raw: updatedRaw,
         };
       });
     },
-    []
+    [resolveNextCounters]
   );
+
+  const flushPendingUpdates = useCallback(() => {
+    if (pendingCountersRef.current.size === 0) {
+      return;
+    }
+
+    const batched = Array.from(pendingCountersRef.current.entries());
+    pendingCountersRef.current.clear();
+
+    for (const [postId, patch] of batched) {
+      const nextCounters = resolveNextCounters(postId, patch);
+      const previousCounters = countersRef.current[postId];
+
+      console.debug("[counters] applying update", {
+        postId,
+        previous: previousCounters,
+        next: nextCounters,
+      });
+
+      handlePostMetricsUpdate(postId, patch);
+    }
+  }, [handlePostMetricsUpdate, resolveNextCounters]);
+
+  const scheduleFlush = useCallback(() => {
+    if (typeof window === "undefined") {
+      flushPendingUpdates();
+      return;
+    }
+
+    if (flushFrameRef.current !== null) {
+      return;
+    }
+
+    flushFrameRef.current = window.requestAnimationFrame(() => {
+      flushFrameRef.current = null;
+      flushPendingUpdates();
+    });
+  }, [flushPendingUpdates]);
 
   const applyCountersUpdates = useCallback(
     (payload?: PostCountersUpdate[] | PostCountersUpdate | null) => {
@@ -406,33 +625,67 @@ export default function App() {
       }
 
       const updates = Array.isArray(payload) ? payload : [payload];
+      let hasNewData = false;
 
       for (const update of updates) {
-        if (!update || typeof update.id !== "string") {
+        if (!update) {
           continue;
         }
 
-        handlePostMetricsUpdate(update.id, {
-          likes:
-            typeof update.likeCount === "number" && Number.isFinite(update.likeCount)
-              ? update.likeCount
-              : undefined,
-          dislikes:
-            typeof update.dislikeCount === "number" && Number.isFinite(update.dislikeCount)
-              ? update.dislikeCount
-              : undefined,
-          views:
-            typeof update.viewCount === "number" && Number.isFinite(update.viewCount)
-              ? update.viewCount
-              : undefined,
-          comments:
-            typeof update.commentCount === "number" && Number.isFinite(update.commentCount)
-              ? update.commentCount
-              : undefined,
+        const postId =
+          typeof update.id === "string" && update.id.trim() !== ""
+            ? update.id.trim()
+            : typeof update.postId === "string" && update.postId.trim() !== ""
+              ? update.postId.trim()
+              : undefined;
+
+        if (!postId) {
+          continue;
+        }
+
+        const patch: PostCountersPatch = {};
+
+        if (typeof update.likeCount === "number" && Number.isFinite(update.likeCount)) {
+          patch.likes = update.likeCount;
+        }
+
+        if (typeof update.dislikeCount === "number" && Number.isFinite(update.dislikeCount)) {
+          patch.dislikes = update.dislikeCount;
+        }
+
+        if (typeof update.viewCount === "number" && Number.isFinite(update.viewCount)) {
+          patch.views = update.viewCount;
+        }
+
+        if (typeof update.commentCount === "number" && Number.isFinite(update.commentCount)) {
+          patch.comments = update.commentCount;
+        }
+
+        if (
+          patch.likes === undefined &&
+          patch.dislikes === undefined &&
+          patch.views === undefined &&
+          patch.comments === undefined
+        ) {
+          continue;
+        }
+
+        const existingPatch = pendingCountersRef.current.get(postId);
+        pendingCountersRef.current.set(postId, {
+          ...existingPatch,
+          ...patch,
         });
+
+        hasNewData = true;
       }
+
+      if (!hasNewData) {
+        return;
+      }
+
+      scheduleFlush();
     },
-    [handlePostMetricsUpdate]
+    [scheduleFlush]
   );
 
   useEffect(() => {
@@ -452,14 +705,21 @@ export default function App() {
 
     let cancelled = false;
     let eventSource: EventSource | null = null;
+    let messageHandler: ((this: EventSource, event: MessageEvent<string>) => void) | null = null;
     let reconnectTimeout: number | null = null;
     let attempt = 0;
     const controller = new AbortController();
 
     const cleanupEventSource = () => {
       if (eventSource) {
+        if (messageHandler) {
+          eventSource.removeEventListener("message", messageHandler);
+          eventSource.removeEventListener("counters", messageHandler);
+        }
+
         eventSource.close();
         eventSource = null;
+        messageHandler = null;
       }
     };
 
@@ -522,8 +782,12 @@ export default function App() {
         clearReconnectTimeout();
       };
 
-      eventSource.onmessage = (event) => {
-        if (!event.data) {
+      messageHandler = function (this: EventSource, event: MessageEvent<string>) {
+        if (cancelled) {
+          return;
+        }
+
+        if (typeof event.data !== "string" || event.data.trim() === "") {
           return;
         }
 
@@ -534,6 +798,9 @@ export default function App() {
           console.warn("Не удалось обработать обновление счётчиков", error);
         }
       };
+
+      eventSource.addEventListener("message", messageHandler);
+      eventSource.addEventListener("counters", messageHandler);
 
       eventSource.onerror = () => {
         if (cancelled) {
@@ -608,6 +875,10 @@ export default function App() {
                           <NewsCard
                             key={item.id}
                             {...item}
+                            likes={countersById[item.id]?.likes ?? item.likes}
+                            dislikes={countersById[item.id]?.dislikes ?? item.dislikes}
+                            comments={countersById[item.id]?.comments ?? item.comments}
+                            views={countersById[item.id]?.views ?? item.views}
                             onViewPost={() => handleViewPost(item)}
                             onPostUpdate={handlePostMetricsUpdate}
                             visibilityObserver={registerPostVisibility}
@@ -663,6 +934,7 @@ export default function App() {
                     title={sectionTitle}
                     description={getSubsectionDescription(sectionTitle)}
                     posts={posts.filter((item) => item.category === sectionTitle)}
+                    countersById={countersById}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
                     registerVisibility={registerPostVisibility}
@@ -712,6 +984,7 @@ export default function App() {
                   <TopicPage
                     topic={topicKey}
                     posts={posts}
+                    countersById={countersById}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
                     registerVisibility={registerPostVisibility}

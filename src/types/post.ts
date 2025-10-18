@@ -24,11 +24,19 @@ export interface PostListResponse {
 }
 
 export interface PostCountersUpdate {
-  id: string;
+  id?: string;
+  postId?: string;
   likeCount?: number;
   dislikeCount?: number;
   viewCount?: number;
   commentCount?: number;
+}
+
+export interface PostCountersState {
+  likes: number;
+  dislikes: number;
+  views: number;
+  comments: number;
 }
 
 export interface PostSummary {
