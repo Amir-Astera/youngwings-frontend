@@ -3,9 +3,18 @@ import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } 
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
-const EVENTS_ENDPOINT = import.meta.env.VITE_API_EVENTS_ENDPOINT ?? "/api/events";
+const UPCOMING_EVENTS_ENDPOINT =
+  import.meta.env.VITE_API_UPCOMING_EVENTS_ENDPOINT ?? "/api/events/upcoming";
+const TOP_UPCOMING_EVENTS_ENDPOINT =
+  import.meta.env.VITE_API_TOP_UPCOMING_EVENTS_ENDPOINT ?? "/api/events/upcoming/top";
 const TRANSLATOR_VACANCIES_ENDPOINT =
   import.meta.env.VITE_API_TRANSLATOR_VACANCIES_ENDPOINT ?? "/api/translator-vacancies";
+const POSTS_BY_CHAPTER_ENDPOINT =
+  import.meta.env.VITE_API_POSTS_BY_CHAPTER_ENDPOINT ?? "/api/posts/by-chapter";
+const POSTS_BY_TOPIC_ENDPOINT =
+  import.meta.env.VITE_API_POSTS_BY_TOPIC_ENDPOINT ?? "/api/posts/by-topic";
+const POPULAR_TOPICS_ENDPOINT =
+  import.meta.env.VITE_API_POPULAR_TOPICS_ENDPOINT ?? "/api/posts/topics/popular";
 const POST_COUNTERS_ENDPOINT = "/api/post/counters";
 const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/live";
 const POST_MY_STATE_ENDPOINT = "/api/post/my-state";
@@ -189,7 +198,7 @@ export async function fetchEvents<T>({
     size: String(size),
   });
 
-  const response = await apiRequest(`${EVENTS_ENDPOINT}?${params.toString()}`, {
+  const response = await apiRequest(`${UPCOMING_EVENTS_ENDPOINT}?${params.toString()}`, {
     method: "GET",
     signal,
   });
@@ -214,6 +223,184 @@ export async function fetchEvents<T>({
     page: typeof parsed.page === "number" ? parsed.page : page,
     size: typeof parsed.size === "number" ? parsed.size : size,
     items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
+}
+
+export async function fetchTopUpcomingEvents<T>({
+  size = 3,
+  signal,
+}: {
+  size?: number;
+  signal?: AbortSignal;
+} = {}): Promise<T[]> {
+  const params = new URLSearchParams({
+    size: String(size),
+  });
+
+  const response = await apiRequest(`${TOP_UPCOMING_EVENTS_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить список ближайших событий");
+  }
+
+  const parsed = await parseJsonResponse<T[] | T>(response);
+
+  if (!parsed) {
+    return [];
+  }
+
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+
+  return [parsed];
+}
+
+export async function fetchPostsByChapter<T>({
+  chapter,
+  page = 1,
+  size = 20,
+  signal,
+}: {
+  chapter: string;
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+}): Promise<PaginatedResponse<T>> {
+  const params = new URLSearchParams({
+    chapter,
+    page: String(page),
+    size: String(size),
+  });
+
+  const response = await apiRequest(`${POSTS_BY_CHAPTER_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить публикации раздела");
+  }
+
+  const parsed = await parseJsonResponse<PaginatedResponse<T>>(response);
+
+  if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return {
+    total: typeof parsed.total === "number" ? parsed.total : 0,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
+}
+
+export async function fetchPostsByTopic<T>({
+  topic,
+  page = 1,
+  size = 20,
+  signal,
+}: {
+  topic: string;
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+}): Promise<PaginatedResponse<T>> {
+  const params = new URLSearchParams({
+    topic,
+    page: String(page),
+    size: String(size),
+  });
+
+  const response = await apiRequest(`${POSTS_BY_TOPIC_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить публикации по теме");
+  }
+
+  const parsed = await parseJsonResponse<PaginatedResponse<T>>(response);
+
+  if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return {
+    total: typeof parsed.total === "number" ? parsed.total : 0,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
+}
+
+export interface PopularTopicsResponse {
+  totalTopics: number;
+  page: number;
+  size: number;
+  topics: string[];
+}
+
+export async function fetchPopularTopics({
+  page = 1,
+  size = 5,
+  signal,
+}: {
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+} = {}): Promise<PopularTopicsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
+
+  const response = await apiRequest(`${POPULAR_TOPICS_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить список популярных тем");
+  }
+
+  const parsed = await parseJsonResponse<PopularTopicsResponse>(response);
+
+  if (!parsed) {
+    return {
+      totalTopics: 0,
+      page,
+      size,
+      topics: [],
+    };
+  }
+
+  const normalizedTopics = Array.isArray(parsed.topics)
+    ? parsed.topics
+        .map((topic) => (typeof topic === "string" ? topic.trim() : ""))
+        .filter((topic) => topic !== "")
+    : [];
+
+  return {
+    totalTopics: typeof parsed.totalTopics === "number" ? parsed.totalTopics : normalizedTopics.length,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    topics: normalizedTopics,
   };
 }
 
