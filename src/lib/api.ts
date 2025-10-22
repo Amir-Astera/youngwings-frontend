@@ -63,7 +63,10 @@ export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaul
 
   if (defaultPrefix) {
     const normalizedPrefix = defaultPrefix.endsWith("/") ? defaultPrefix.slice(0, -1) : defaultPrefix;
-    return resolveApiUrl(`${normalizedPrefix}/${sanitized}`);
+    const combinedPath = `${normalizedPrefix}/${sanitized}`;
+    const normalizedCombined = combinedPath.startsWith("/") ? combinedPath : `/${combinedPath}`;
+
+    return resolveApiUrl(ensureThumbnailSegment(normalizedCombined));
   }
 
   return resolveApiUrl(`/${sanitized}`);
