@@ -1,4 +1,5 @@
 import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
+import type { SearchKind, SearchResponse } from "../types/search";
 import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } from "../types/post";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
@@ -138,6 +139,36 @@ interface PaginatedResponse<T> {
   page: number;
   size: number;
   items: T[];
+}
+
+function sanitizeSearchKinds(kinds?: SearchKind[] | SearchKind): string | undefined {
+  if (!kinds) {
+    return undefined;
+  }
+
+  if (typeof kinds === "string") {
+    const trimmed = kinds.trim();
+
+    if (trimmed) {
+      return trimmed
+        .split(",")
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean)
+        .join(",");
+    }
+
+    return undefined;
+  }
+
+  const normalized = kinds
+    .map((value) => value?.toString().trim().toUpperCase())
+    .filter(Boolean);
+
+  if (!normalized.length) {
+    return undefined;
+  }
+
+  return Array.from(new Set(normalized)).join(",");
 }
 
 export async function fetchAllPosts({
@@ -777,6 +808,72 @@ export async function createComment(
   }
 
   return parseJsonResponse<CommentResponse>(response);
+}
+
+export async function searchContent({
+  query,
+  page = 1,
+  size = 10,
+  kinds,
+  signal,
+}: {
+  query: string;
+  page?: number;
+  size?: number;
+  kinds?: SearchKind[] | SearchKind;
+  signal?: AbortSignal;
+}): Promise<SearchResponse> {
+  const trimmedQuery = query.trim();
+
+  if (!trimmedQuery) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  const params = new URLSearchParams({
+    q: trimmedQuery,
+    page: String(page),
+    size: String(size),
+  });
+
+  const normalizedKinds = sanitizeSearchKinds(kinds);
+
+  if (normalizedKinds) {
+    params.set("kinds", normalizedKinds);
+  }
+
+  const endpoint = `/api/search?${params.toString()}`;
+
+  const response = await apiRequest(endpoint, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось выполнить поиск");
+  }
+
+  const parsed = await parseJsonResponse<SearchResponse>(response);
+
+  if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return {
+    total: typeof parsed.total === "number" ? parsed.total : 0,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
 }
 
 async function sendCommentReactionRequest(
