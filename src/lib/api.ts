@@ -30,12 +30,16 @@ function ensureAssetsSegmentUppercase(value: string): string {
   return value.replace(/(^|\/)assets(?=\/)/gi, (_, prefix: string) => `${prefix}ASSETS`);
 }
 
+function ensureThumbnailSegment(value: string): string {
+  return value.replace(/(^|\/)api\/files(?!\/thumbnail)(?=\/ASSETS\/)/gi, (match) => `${match}/thumbnail`);
+}
+
 export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaultPrefix?: string } = {}): string | undefined {
   if (!path) {
     return undefined;
   }
 
-  const trimmed = ensureAssetsSegmentUppercase(path.trim());
+  const trimmed = ensureThumbnailSegment(ensureAssetsSegmentUppercase(path.trim()));
 
   if (!trimmed) {
     return undefined;
@@ -45,7 +49,9 @@ export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaul
     return trimmed;
   }
 
-  const sanitized = ensureAssetsSegmentUppercase(trimmed.replace(/^\/+/, ""));
+  const sanitized = ensureThumbnailSegment(
+    ensureAssetsSegmentUppercase(trimmed.replace(/^\/+/, ""))
+  );
 
   if (trimmed.startsWith("/")) {
     return resolveApiUrl(trimmed);
