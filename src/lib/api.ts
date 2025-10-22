@@ -3,13 +3,16 @@ import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } 
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
+const EVENTS_ENDPOINT = import.meta.env.VITE_API_EVENTS_ENDPOINT ?? "/api/events";
+const TRANSLATOR_VACANCIES_ENDPOINT =
+  import.meta.env.VITE_API_TRANSLATOR_VACANCIES_ENDPOINT ?? "/api/translator-vacancies";
 const POST_COUNTERS_ENDPOINT = "/api/post/counters";
 const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/live";
 const POST_MY_STATE_ENDPOINT = "/api/post/my-state";
 const CSRF_COOKIE_NAME = "yw_csrf";
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-function buildUrl(path: string): string {
+export function resolveApiUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
@@ -21,6 +24,39 @@ function buildUrl(path: string): string {
   }
 
   return `${API_BASE_URL}${normalizedPath}`;
+}
+
+export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaultPrefix?: string } = {}): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+
+  const trimmed = path.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const sanitized = trimmed.replace(/^\/+/, "");
+
+  if (trimmed.startsWith("/")) {
+    return resolveApiUrl(trimmed);
+  }
+
+  if (/^api\//i.test(sanitized)) {
+    return resolveApiUrl(`/${sanitized}`);
+  }
+
+  if (defaultPrefix) {
+    const normalizedPrefix = defaultPrefix.endsWith("/") ? defaultPrefix.slice(0, -1) : defaultPrefix;
+    return resolveApiUrl(`${normalizedPrefix}/${sanitized}`);
+  }
+
+  return resolveApiUrl(`/${sanitized}`);
 }
 
 function getCookie(name: string): string | null {
@@ -67,12 +103,19 @@ async function apiRequest(path: string, init: RequestInit = {}): Promise<Respons
     }
   }
 
-  return fetch(buildUrl(path), {
+  return fetch(resolveApiUrl(path), {
     ...init,
     method,
     credentials: "include",
     headers,
   });
+}
+
+interface PaginatedResponse<T> {
+  total: number;
+  page: number;
+  size: number;
+  items: T[];
 }
 
 export async function fetchAllPosts({
@@ -101,6 +144,90 @@ export async function fetchAllPosts({
   }
 
   const parsed = await parseJsonResponse<PostListResponse>(response);
+
+  if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return {
+    total: typeof parsed.total === "number" ? parsed.total : 0,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
+}
+
+export async function fetchEvents<T>({
+  page = 1,
+  size = 20,
+  signal,
+}: {
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+} = {}): Promise<PaginatedResponse<T>> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
+
+  const response = await apiRequest(`${EVENTS_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить список событий");
+  }
+
+  const parsed = await parseJsonResponse<PaginatedResponse<T>>(response);
+
+  if (!parsed) {
+    return {
+      total: 0,
+      page,
+      size,
+      items: [],
+    };
+  }
+
+  return {
+    total: typeof parsed.total === "number" ? parsed.total : 0,
+    page: typeof parsed.page === "number" ? parsed.page : page,
+    size: typeof parsed.size === "number" ? parsed.size : size,
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+  };
+}
+
+export async function fetchTranslatorVacancies<T>({
+  page = 1,
+  size = 20,
+  signal,
+}: {
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+} = {}): Promise<PaginatedResponse<T>> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
+
+  const response = await apiRequest(`${TRANSLATOR_VACANCIES_ENDPOINT}?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить список переводчиков");
+  }
+
+  const parsed = await parseJsonResponse<PaginatedResponse<T>>(response);
 
   if (!parsed) {
     return {
