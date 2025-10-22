@@ -20,6 +20,7 @@ import {
   fetchAllPosts,
   fetchPostCounters,
   fetchPostMyState,
+  resolveFileUrl,
 } from "./lib/api";
 import { formatRelativeTime } from "./lib/dates";
 import { useVisiblePosts } from "./lib/useVisiblePosts";
@@ -103,8 +104,21 @@ function mapPostResponseToSummary(post: PostResponse): PostSummary {
   const title = (post.title ?? "").trim();
   const excerptSource = (post.description ?? "").trim() || extractPlainTextFromContent(post.content);
   const rawThumbnail = typeof post.thumbnail === "string" ? post.thumbnail.trim() : "";
-  const image =
-    rawThumbnail && !/^(нет\s+фотки?|string)$/i.test(rawThumbnail) ? rawThumbnail : undefined;
+  let image: string | undefined;
+
+  if (rawThumbnail && !/^(нет\s+фотки?|string)$/i.test(rawThumbnail)) {
+    const sanitized = rawThumbnail.replace(/^\/+/, "");
+
+    if (/^https?:\/\//i.test(rawThumbnail)) {
+      image = rawThumbnail;
+    } else if (rawThumbnail.startsWith("/")) {
+      image = resolveFileUrl(rawThumbnail) ?? undefined;
+    } else if (/^api\//i.test(sanitized)) {
+      image = resolveFileUrl(`/${sanitized}`) ?? undefined;
+    } else {
+      image = resolveFileUrl(sanitized, { defaultPrefix: "/api/files/thumbnail" }) ?? undefined;
+    }
+  }
   const category = (post.chapter ?? "").trim();
   const topic = (post.topic ?? "").trim();
   const author = (post.author ?? "").trim();

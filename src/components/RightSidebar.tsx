@@ -1,8 +1,11 @@
-import { Calendar, TrendingUp, Heart, Share2, Twitter, Facebook, Link2 } from "lucide-react";
+import { Calendar, TrendingUp, Heart, Share2, Twitter, Facebook, Link2, MapPin, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { fetchEvents } from "../lib/api";
+import { formatEventDate, formatEventTime } from "../lib/events";
+import type { EventResponse } from "../types/event";
 
 interface RightSidebarProps {
   onPageChange: (page: string) => void;
@@ -16,6 +19,9 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
   const containerRef = useRef<HTMLDivElement>(null);
   const supportBlockRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
+  const [events, setEvents] = useState<EventResponse[]>([]);
+  const [isEventsLoading, setIsEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
   const handleShare = async (platform: string, title: string) => {
     const url = window.location.href;
@@ -79,26 +85,42 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
     { name: "EdTech", count: 128 },
   ];
 
-  const events = [
-    {
-      id: 1,
-      title: "TechCrunch Disrupt 2025",
-      date: "15-17 ноября",
-      location: "Алматы",
-    },
-    {
-      id: 2,
-      title: "Startup Weekend",
-      date: "22-24 ноября",
-      location: "Астана",
-    },
-    {
-      id: 3,
-      title: "AI Conference",
-      date: "5-7 декабря",
-      location: "Онлайн",
-    },
-  ];
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadEvents = async () => {
+      setIsEventsLoading(true);
+      setEventsError(null);
+
+      try {
+        const response = await fetchEvents<EventResponse>({ page: 1, size: 5, signal: controller.signal });
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setEvents(Array.isArray(response.items) ? response.items : []);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+
+        if (!controller.signal.aborted) {
+          setEventsError("Не удалось загрузить события");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsEventsLoading(false);
+        }
+      }
+    };
+
+    void loadEvents();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -206,21 +228,54 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
             <h3 className="text-sm">Ближайшие события</h3>
           </div>
           <div ref={eventsRef} className="space-y-4 max-h-[300px] overflow-y-auto scrollbar-hide">
-            {events.map((event) => (
-              <button
-                key={event.id}
-                onClick={() => onPageChange("upcoming-events")}
-                className="w-full text-left pb-4 border-b border-gray-100 last:border-0 last:pb-0 hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
-              >
-                <h4 className="text-sm mb-1">{event.title}</h4>
-                <p className="text-xs text-muted-foreground mb-0.5">{event.date}</p>
-                <p className="text-xs text-muted-foreground">{event.location}</p>
-              </button>
-            ))}
+            {isEventsLoading && events.length === 0 && (
+              <p className="text-xs text-muted-foreground">Загрузка...</p>
+            )}
+
+            {eventsError && events.length === 0 && !isEventsLoading && (
+              <p className="text-xs text-red-500">{eventsError}</p>
+            )}
+
+            {events.map((event) => {
+              const eventDate = formatEventDate(event.eventDate);
+              const eventTime = formatEventTime(event.eventTime);
+
+              return (
+                <button
+                  key={event.id}
+                  onClick={() => onPageChange("upcoming-events")}
+                  className="w-full text-left pb-4 border-b border-gray-100 last:border-0 last:pb-0 hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
+                >
+                  <h4 className="text-sm mb-1">{event.title}</h4>
+                  {eventDate && (
+                    <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      <span>{eventDate}</span>
+                    </p>
+                  )}
+                  {eventTime && (
+                    <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-blue-600" />
+                      <span>{eventTime}</span>
+                    </p>
+                  )}
+                  {event.location && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-blue-600" />
+                      <span>{event.location}</span>
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+
+            {!isEventsLoading && !eventsError && events.length === 0 && (
+              <p className="text-xs text-muted-foreground">Событий пока нет</p>
+            )}
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="w-full mt-4"
             onClick={() => onPageChange("upcoming-events")}
           >

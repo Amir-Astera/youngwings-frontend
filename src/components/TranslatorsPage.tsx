@@ -1,55 +1,96 @@
-import { useState } from "react";
-import { Languages, MapPin, Clock, QrCode, User, UserCircle, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Languages, MapPin, Clock, QrCode, User, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Checkbox } from "./ui/checkbox";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Avatar, AvatarFallback } from "./ui/avatar";
+import { fetchTranslatorVacancies, resolveFileUrl } from "../lib/api";
+import type { TranslatorResponse } from "../types/translator";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
 
-const translators = [
-  {
-    id: 1,
-    name: "Айгуль Нурланова",
-    languages: ["Русский", "Английский", "Казахский"],
-    specialization: "Технические переводы, IT-документация",
-    location: "Алматы",
-    experience: "8 лет",
-    username: "@aigul_translator",
-    qrCode: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=@aigul_translator"
-  },
-  {
-    id: 2,
-    name: "Дмитрий Ким",
-    languages: ["Английский", "Корейский", "Русский"],
-    specialization: "Деловые переводы, контракты",
-    location: "Астана",
-    experience: "10 лет",
-    username: "@dmitry_kim_translator",
-    qrCode: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=@dmitry_kim_translator"
-  },
-  {
-    id: 3,
-    name: "Лейла Сабитова",
-    languages: ["Французский", "Русский", "Английский"],
-    specialization: "Юридические переводы",
-    location: "Алматы",
-    experience: "6 лет",
-    username: "@leila_legal",
-    qrCode: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=@leila_legal"
-  },
-  {
-    id: 4,
-    name: "Марат Токтаров",
-    languages: ["Немецкий", "Русский", "Казахский"],
-    specialization: "Технические переводы, маркетинг",
-    location: "Шымкент",
-    experience: "7 лет",
-    username: "@marat_tech",
-    qrCode: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=@marat_tech"
-  },
-];
+interface TranslatorItem {
+  id: string;
+  name: string;
+  languages: string[];
+  specialization?: string;
+  location?: string;
+  experience?: string;
+  experienceYears?: number | null;
+  username?: string;
+  qrCode?: string;
+}
+
+const DEFAULT_PAGE_SIZE = 20;
+
+function parseLanguages(value?: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(/[,;]+/)
+    .map((lang) => lang.trim())
+    .filter((lang) => lang.length > 0);
+}
+
+function parseExperienceYears(value?: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/\d+/);
+
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[0], 10);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
+  const name = (response.fullName ?? "").trim() || "Без имени";
+  const languages = parseLanguages(response.languages);
+  const experience = response.experience?.trim();
+  const specialization = response.specialization?.trim();
+  const location = response.location?.trim();
+  const username = response.nickname?.trim();
+  const qrCode = resolveFileUrl(response.qrUrl ?? undefined, { defaultPrefix: "/api/files/assets" }) ?? undefined;
+
+  return {
+    id: response.id,
+    name,
+    languages,
+    specialization: specialization || undefined,
+    location: location || undefined,
+    experience: experience || undefined,
+    experienceYears: parseExperienceYears(experience),
+    username: username || undefined,
+    qrCode,
+  };
+}
+
+function getInitials(name?: string): string {
+  if (!name) {
+    return "П";
+  }
+
+  const parts = name
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .slice(0, 2);
+
+  if (parts.length === 0) {
+    return "П";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "П";
+}
 
 const services = [
   {
@@ -79,15 +120,85 @@ const services = [
 ];
 
 export function TranslatorsPage() {
+  const [translators, setTranslators] = useState<TranslatorItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedQR, setSelectedQR] = useState<string | null>(null);
-  const [showUsername, setShowUsername] = useState<number | null>(null);
+  const [showUsername, setShowUsername] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [languageFilters, setLanguageFilters] = useState<string[]>([]);
   const [experienceFilter, setExperienceFilter] = useState<string>("all");
 
+  const loadTranslators = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetchTranslatorVacancies<TranslatorResponse>({
+          page: 1,
+          size: DEFAULT_PAGE_SIZE,
+          signal,
+        });
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        const mapped = Array.isArray(response.items)
+          ? response.items
+              .filter((item): item is TranslatorResponse => Boolean(item && typeof item.id === "string"))
+              .map(mapTranslatorResponse)
+          : [];
+
+        setTranslators(mapped);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+
+        if (!signal?.aborted) {
+          setError(err instanceof Error ? err.message : "Не удалось загрузить переводчиков");
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void loadTranslators(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [loadTranslators]);
+
+  const handleRetry = useCallback(() => {
+    void loadTranslators();
+  }, [loadTranslators]);
+
   // Get unique locations and languages
-  const locations = Array.from(new Set(translators.map(t => t.location)));
-  const allLanguages = Array.from(new Set(translators.flatMap(t => t.languages)));
+  const locations = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          translators
+            .map((translator) => translator.location)
+            .filter((location): location is string => Boolean(location)),
+        ),
+      ),
+    [translators],
+  );
+  const allLanguages = useMemo(
+    () => Array.from(new Set(translators.flatMap((translator) => translator.languages))),
+    [translators],
+  );
 
   // Toggle language filter
   const toggleLanguageFilter = (lang: string) => {
@@ -99,17 +210,31 @@ export function TranslatorsPage() {
   };
 
   // Filter translators
-  const filteredTranslators = translators.filter(translator => {
-    const locationMatch = locationFilter === "all" || translator.location === locationFilter;
-    const languageMatch = languageFilters.length === 0 || 
-                         languageFilters.some(lang => translator.languages.includes(lang));
-    const experienceYears = parseInt(translator.experience);
-    const experienceMatch = experienceFilter === "all" ||
-                           (experienceFilter === "5+" && experienceYears >= 5) ||
-                           (experienceFilter === "8+" && experienceYears >= 8) ||
-                           (experienceFilter === "10+" && experienceYears >= 10);
-    return locationMatch && languageMatch && experienceMatch;
-  });
+  const filteredTranslators = useMemo(() => {
+    return translators.filter((translator) => {
+      const locationMatch = locationFilter === "all" || translator.location === locationFilter;
+      const languageMatch =
+        languageFilters.length === 0 || languageFilters.some((lang) => translator.languages.includes(lang));
+
+      let experienceMatch = true;
+
+      if (experienceFilter !== "all") {
+        const thresholds: Record<string, number> = {
+          "5+": 5,
+          "8+": 8,
+          "10+": 10,
+        };
+
+        const threshold = thresholds[experienceFilter];
+
+        if (threshold !== undefined) {
+          experienceMatch = (translator.experienceYears ?? 0) >= threshold;
+        }
+      }
+
+      return locationMatch && languageMatch && experienceMatch;
+    });
+  }, [experienceFilter, languageFilters, locationFilter, translators]);
 
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
@@ -211,7 +336,18 @@ export function TranslatorsPage() {
       {/* Translators List */}
       <div className="space-y-5">
         <h2>Наши переводчики</h2>
-        {filteredTranslators.length === 0 ? (
+        {isLoading && translators.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-muted-foreground">
+            Загрузка переводчиков...
+          </div>
+        ) : error && translators.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-3">
+            <p className="text-muted-foreground text-sm">{error}</p>
+            <Button variant="outline" size="sm" onClick={handleRetry}>
+              Повторить попытку
+            </Button>
+          </div>
+        ) : filteredTranslators.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
             <p className="text-muted-foreground">
               Переводчики по выбранным фильтрам не найдены
@@ -229,19 +365,19 @@ export function TranslatorsPage() {
                 {/* Top: Photo and Name */}
                 <div className="flex items-center gap-4">
                   <Avatar className="w-20 h-20">
-                    <AvatarFallback>
-                      <UserCircle className="w-full h-full text-gray-400" />
+                    <AvatarFallback className="bg-blue-50 text-blue-700 font-semibold text-lg">
+                      {getInitials(translator.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <h3 className="mb-2">{translator.name}</h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <MapPin className="w-4 h-4" />
-                      <span>{translator.location}</span>
+                      <span>{translator.location ?? "Локация не указана"}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
-                      <span>Опыт: {translator.experience}</span>
+                      <span>Опыт: {translator.experience ?? "не указан"}</span>
                     </div>
                   </div>
                 </div>
@@ -252,38 +388,44 @@ export function TranslatorsPage() {
                     <Languages className="w-4 h-4 text-primary" />
                     <span className="text-sm">Языки:</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {translator.languages.map((lang, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs"
-                      >
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
+                  {translator.languages.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {translator.languages.map((lang, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs"
+                        >
+                          {lang}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Языки не указаны</p>
+                  )}
                 </div>
 
                 {/* Specialization */}
                 <p className="text-sm text-muted-foreground">
-                  <span className="text-gray-900">Специализация:</span> {translator.specialization}
+                  <span className="text-gray-900">Специализация:</span> {translator.specialization ?? "не указана"}
                 </p>
 
                 {/* Buttons */}
                 <div className="flex gap-3 flex-wrap">
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="gap-2 flex-1"
-                    onClick={() => setSelectedQR(translator.qrCode)}
+                    onClick={() => translator.qrCode && setSelectedQR(translator.qrCode)}
+                    disabled={!translator.qrCode}
                   >
                     <QrCode className="w-4 h-4" />
                     QR
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="gap-2 flex-1"
                     onClick={() => setShowUsername(showUsername === translator.id ? null : translator.id)}
+                    disabled={!translator.username}
                   >
                     <User className="w-4 h-4" />
                     Показать никнейм
@@ -291,7 +433,7 @@ export function TranslatorsPage() {
                 </div>
 
                 {/* Username Display */}
-                {showUsername === translator.id && (
+                {showUsername === translator.id && translator.username && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-900">
                       <span className="font-medium">Никнейм:</span> {translator.username}
@@ -304,8 +446,8 @@ export function TranslatorsPage() {
               <div className="hidden md:flex gap-6">
                 {/* Photo - Left Side */}
                 <Avatar className="w-32 h-32 rounded-xl">
-                  <AvatarFallback className="rounded-xl">
-                    <UserCircle className="w-full h-full text-gray-400" />
+                  <AvatarFallback className="rounded-xl bg-blue-50 text-blue-700 font-semibold text-xl">
+                    {getInitials(translator.name)}
                   </AvatarFallback>
                 </Avatar>
 
@@ -315,11 +457,11 @@ export function TranslatorsPage() {
                     <h3 className="mb-2">{translator.name}</h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <MapPin className="w-4 h-4" />
-                      <span>{translator.location}</span>
+                      <span>{translator.location ?? "Локация не указана"}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
-                      <span>Опыт: {translator.experience}</span>
+                      <span>Опыт: {translator.experience ?? "не указан"}</span>
                     </div>
                   </div>
 
@@ -328,43 +470,49 @@ export function TranslatorsPage() {
                       <Languages className="w-4 h-4 text-primary" />
                       <span className="text-sm">Языки:</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {translator.languages.map((lang, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs"
-                        >
-                          {lang}
-                        </span>
-                      ))}
-                    </div>
+                    {translator.languages.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {translator.languages.map((lang, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs"
+                          >
+                            {lang}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Языки не указаны</p>
+                    )}
                   </div>
 
                   <p className="text-sm text-muted-foreground mb-4">
-                    <span className="text-gray-900">Специализация:</span> {translator.specialization}
+                    <span className="text-gray-900">Специализация:</span> {translator.specialization ?? "не указана"}
                   </p>
 
                   <div className="flex gap-3 flex-wrap">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="gap-2"
-                      onClick={() => setSelectedQR(translator.qrCode)}
+                      onClick={() => translator.qrCode && setSelectedQR(translator.qrCode)}
+                      disabled={!translator.qrCode}
                     >
                       <QrCode className="w-4 h-4" />
                       QR
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       className="gap-2"
                       onClick={() => setShowUsername(showUsername === translator.id ? null : translator.id)}
+                      disabled={!translator.username}
                     >
                       <User className="w-4 h-4" />
                       Показать никнейм
                     </Button>
                   </div>
 
-                  {showUsername === translator.id && (
+                  {showUsername === translator.id && translator.username && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm text-blue-900">
                         <span className="font-medium">Никнейм:</span> {translator.username}
@@ -399,12 +547,10 @@ export function TranslatorsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center p-6">
-            {selectedQR && (
-              <img 
-                src={selectedQR} 
-                alt="QR Code" 
-                className="w-64 h-64 object-contain"
-              />
+            {selectedQR ? (
+              <ImageWithFallback src={selectedQR} alt="QR Code" className="w-64 h-64 object-contain" />
+            ) : (
+              <p className="text-sm text-muted-foreground">QR-код недоступен</p>
             )}
           </div>
         </DialogContent>
