@@ -18,6 +18,8 @@ import { Button } from "./components/ui/button";
 import {
   createPostCountersEventSource,
   fetchAllPosts,
+  fetchPostsByChapter,
+  fetchPostsByTopic,
   fetchPostCounters,
   fetchPostMyState,
   resolveFileUrl,
@@ -229,6 +231,12 @@ type PostCountersPatch = {
   comments?: number;
 };
 
+interface SectionPostsState {
+  items: PostSummary[];
+  isLoading: boolean;
+  error: string | null;
+}
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [viewingPost, setViewingPost] = useState(false);
@@ -238,6 +246,8 @@ export default function App() {
   const [personalStateById, setPersonalStateById] = useState<Record<string, PostPersonalState>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subsectionStates, setSubsectionStates] = useState<Record<string, SectionPostsState>>({});
+  const [topicStates, setTopicStates] = useState<Record<string, SectionPostsState>>({});
   const { register: registerPostVisibility, visibleIds: observedVisibleIds } = useVisiblePosts();
   const [debouncedVisibleIds, setDebouncedVisibleIds] = useState<string[]>([]);
   const countersRef = useRef<Record<string, PostCountersState>>({});
@@ -246,6 +256,347 @@ export default function App() {
   const personalStateRef = useRef<Record<string, PostPersonalState>>({});
   const pendingCountersRef = useRef<Map<string, PostCountersPatch>>(new Map());
   const flushFrameRef = useRef<number | null>(null);
+
+  const mergePostsIntoState = useCallback(
+    (incoming: PostSummary[]) => {
+      if (!Array.isArray(incoming) || incoming.length === 0) {
+        return;
+      }
+
+      setPosts((previous) => {
+        if (!previous.length) {
+          const sorted = [...incoming].sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+
+          return sorted;
+        }
+
+        const map = new Map<string, PostSummary>();
+
+        for (const item of previous) {
+          map.set(item.id, item);
+        }
+
+        let changed = false;
+
+        for (const item of incoming) {
+          if (!item?.id) {
+            continue;
+          }
+
+          const existing = map.get(item.id);
+
+          if (!existing) {
+            map.set(item.id, item);
+            changed = true;
+            continue;
+          }
+
+          const nextItem: PostSummary = {
+            ...existing,
+            ...item,
+            myReaction: existing.myReaction ?? item.myReaction ?? null,
+            hasViewed: existing.hasViewed ?? item.hasViewed ?? false,
+            raw: item.raw ?? existing.raw,
+          };
+
+          if (
+            existing.title !== nextItem.title ||
+            existing.excerpt !== nextItem.excerpt ||
+            existing.image !== nextItem.image ||
+            existing.category !== nextItem.category ||
+            existing.topic !== nextItem.topic ||
+            existing.author !== nextItem.author ||
+            existing.date !== nextItem.date ||
+            existing.likes !== nextItem.likes ||
+            existing.dislikes !== nextItem.dislikes ||
+            existing.comments !== nextItem.comments ||
+            existing.views !== nextItem.views ||
+            existing.createdAt !== nextItem.createdAt ||
+            existing.updatedAt !== nextItem.updatedAt
+          ) {
+            map.set(item.id, nextItem);
+            changed = true;
+          }
+        }
+
+        if (!changed) {
+          return previous;
+        }
+
+        const merged = Array.from(map.values());
+
+        merged.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+
+        return merged;
+      });
+
+      setCountersById((previous) => {
+        let next = previous;
+        let changed = false;
+
+        for (const item of incoming) {
+          if (!item?.id) {
+            continue;
+          }
+
+          const counters: PostCountersState = {
+            likes: typeof item.likes === "number" && Number.isFinite(item.likes) ? item.likes : 0,
+            dislikes: typeof item.dislikes === "number" && Number.isFinite(item.dislikes) ? item.dislikes : 0,
+            comments: typeof item.comments === "number" && Number.isFinite(item.comments) ? item.comments : 0,
+            views: typeof item.views === "number" && Number.isFinite(item.views) ? item.views : 0,
+          };
+
+          const existing = previous[item.id];
+
+          if (
+            !existing ||
+            existing.likes !== counters.likes ||
+            existing.dislikes !== counters.dislikes ||
+            existing.comments !== counters.comments ||
+            existing.views !== counters.views
+          ) {
+            if (!changed) {
+              next = { ...previous };
+              changed = true;
+            }
+
+            next[item.id] = counters;
+          }
+        }
+
+        return changed ? next : previous;
+      });
+
+      setCurrentPostData((previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        const updated = incoming.find((item) => item.id === previous.id);
+
+        if (!updated) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          ...updated,
+          raw: updated.raw ?? previous.raw,
+        } satisfies PostSummary;
+      });
+    },
+    [],
+  );
+
+  const loadSubsectionPosts = useCallback(
+    async (
+      subsection: string,
+      { signal, force = false }: { signal?: AbortSignal; force?: boolean } = {},
+    ) => {
+      const key = subsection.trim();
+
+      if (!key) {
+        return;
+      }
+
+      let shouldFetch = true;
+
+      setSubsectionStates((previous) => {
+        const current = previous[key];
+
+        if (!force && current?.isLoading) {
+          shouldFetch = false;
+          return previous;
+        }
+
+        return {
+          ...previous,
+          [key]: {
+            items: current?.items ?? [],
+            isLoading: true,
+            error: null,
+          },
+        } satisfies Record<string, SectionPostsState>;
+      });
+
+      if (!shouldFetch) {
+        return;
+      }
+
+      try {
+        const response = await fetchPostsByChapter<PostResponse>({
+          chapter: key,
+          page: 1,
+          size: POSTS_PAGE_SIZE,
+          signal,
+        });
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        const items = Array.isArray(response.items) ? response.items : [];
+
+        const normalized = items.map((item) => {
+          const summary = mapPostResponseToSummary(item);
+          const personal = personalStateRef.current[summary.id];
+
+          if (!personal) {
+            return summary;
+          }
+
+          return {
+            ...summary,
+            myReaction: personal.reaction ?? null,
+            hasViewed: Boolean(personal.viewed),
+          } satisfies PostSummary;
+        });
+
+        setSubsectionStates((previous) => ({
+          ...previous,
+          [key]: {
+            items: normalized,
+            isLoading: false,
+            error: null,
+          },
+        }));
+
+        mergePostsIntoState(normalized);
+      } catch (caughtError) {
+        if (signal?.aborted) {
+          return;
+        }
+
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Не удалось загрузить публикации раздела";
+
+        setSubsectionStates((previous) => {
+          const current = previous[key];
+
+          return {
+            ...previous,
+            [key]: {
+              items: current?.items ?? [],
+              isLoading: false,
+              error: message,
+            },
+          };
+        });
+      }
+    },
+    [mergePostsIntoState],
+  );
+
+  const loadTopicPosts = useCallback(
+    async (
+      topic: string,
+      { signal, force = false }: { signal?: AbortSignal; force?: boolean } = {},
+    ) => {
+      const key = topic.trim();
+
+      if (!key) {
+        return;
+      }
+
+      let shouldFetch = true;
+
+      setTopicStates((previous) => {
+        const current = previous[key];
+
+        if (!force && current?.isLoading) {
+          shouldFetch = false;
+          return previous;
+        }
+
+        return {
+          ...previous,
+          [key]: {
+            items: current?.items ?? [],
+            isLoading: true,
+            error: null,
+          },
+        } satisfies Record<string, SectionPostsState>;
+      });
+
+      if (!shouldFetch) {
+        return;
+      }
+
+      try {
+        const response = await fetchPostsByTopic<PostResponse>({
+          topic: key,
+          page: 1,
+          size: POSTS_PAGE_SIZE,
+          signal,
+        });
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        const items = Array.isArray(response.items) ? response.items : [];
+
+        const normalized = items.map((item) => {
+          const summary = mapPostResponseToSummary(item);
+          const personal = personalStateRef.current[summary.id];
+
+          if (!personal) {
+            return summary;
+          }
+
+          return {
+            ...summary,
+            myReaction: personal.reaction ?? null,
+            hasViewed: Boolean(personal.viewed),
+          } satisfies PostSummary;
+        });
+
+        setTopicStates((previous) => ({
+          ...previous,
+          [key]: {
+            items: normalized,
+            isLoading: false,
+            error: null,
+          },
+        }));
+
+        mergePostsIntoState(normalized);
+      } catch (caughtError) {
+        if (signal?.aborted) {
+          return;
+        }
+
+        const message =
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Не удалось загрузить публикации по теме";
+
+        setTopicStates((previous) => {
+          const current = previous[key];
+
+          return {
+            ...previous,
+            [key]: {
+              items: current?.items ?? [],
+              isLoading: false,
+              error: message,
+            },
+          };
+        });
+      }
+    },
+    [mergePostsIntoState],
+  );
 
   useEffect(() => {
     countersRef.current = countersById;
@@ -274,6 +625,54 @@ export default function App() {
       flushFrameRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentPage.startsWith("subsection-")) {
+      return;
+    }
+
+    const subsection = currentPage.replace("subsection-", "").trim();
+
+    if (!subsection) {
+      return;
+    }
+
+    if (subsectionStates[subsection]) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void loadSubsectionPosts(subsection, { signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
+  }, [currentPage, loadSubsectionPosts, subsectionStates]);
+
+  useEffect(() => {
+    if (!currentPage.startsWith("topic-")) {
+      return;
+    }
+
+    const topic = currentPage.replace("topic-", "").trim();
+
+    if (!topic) {
+      return;
+    }
+
+    if (topicStates[topic]) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void loadTopicPosts(topic, { signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
+  }, [currentPage, loadTopicPosts, topicStates]);
 
   const sortedVisibleIds = useMemo(() => {
     if (!posts.length || observedVisibleIds.length === 0) {
@@ -710,6 +1109,20 @@ export default function App() {
       fetchPosts();
     }
   };
+
+  const handleRetrySubsection = useCallback(
+    (subsection: string) => {
+      void loadSubsectionPosts(subsection, { force: true });
+    },
+    [loadSubsectionPosts],
+  );
+
+  const handleRetryTopic = useCallback(
+    (topic: string) => {
+      void loadTopicPosts(topic, { force: true });
+    },
+    [loadTopicPosts],
+  );
 
   const handlePostMetricsUpdate = useCallback(
     (postId: string, metrics: PostCountersPatch) => {
@@ -1217,9 +1630,16 @@ export default function App() {
               {currentPage === "contacts" && <ContactsPage />}
 
               {currentPage.startsWith("subsection-") && !viewingPost && (() => {
-                const sectionTitle = currentPage.replace("subsection-", "");
+                const rawSectionTitle = currentPage.replace("subsection-", "");
+                const subsectionKey = rawSectionTitle.trim();
+                const sectionState = subsectionStates[subsectionKey];
+                const fallbackPosts = posts.filter((item) => item.category === subsectionKey);
+                const sectionPosts =
+                  sectionState?.items && sectionState.items.length > 0
+                    ? sectionState.items
+                    : fallbackPosts;
 
-                if (isLoading && posts.length === 0) {
+                if (sectionState?.isLoading && sectionPosts.length === 0) {
                   return (
                     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
                       <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
@@ -1229,12 +1649,12 @@ export default function App() {
                   );
                 }
 
-                if (error && posts.length === 0) {
+                if (sectionState?.error && !sectionState.isLoading && sectionPosts.length === 0) {
                   return (
                     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
                       <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-4">
-                        <p className="text-muted-foreground">{error}</p>
-                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                        <p className="text-muted-foreground">{sectionState.error}</p>
+                        <Button variant="outline" size="sm" onClick={() => handleRetrySubsection(subsectionKey)}>
                           Повторить попытку
                         </Button>
                       </div>
@@ -1244,9 +1664,9 @@ export default function App() {
 
                 return (
                   <SubsectionPage
-                    title={sectionTitle}
-                    description={getSubsectionDescription(sectionTitle)}
-                    posts={posts.filter((item) => item.category === sectionTitle)}
+                    title={rawSectionTitle}
+                    description={getSubsectionDescription(rawSectionTitle)}
+                    posts={sectionPosts}
                     countersById={countersById}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}
@@ -1270,9 +1690,13 @@ export default function App() {
               {currentPage === "upcoming-events" && <UpcomingEventsPage onPageChange={setCurrentPage} />}
 
               {currentPage.startsWith("topic-") && !viewingPost && (() => {
-                const topicKey = currentPage.replace("topic-", "");
+                const rawTopicKey = currentPage.replace("topic-", "");
+                const topicKey = rawTopicKey.trim();
+                const topicState = topicStates[topicKey];
+                const topicPosts =
+                  topicState?.items && topicState.items.length > 0 ? topicState.items : posts;
 
-                if (isLoading && posts.length === 0) {
+                if (topicState?.isLoading && topicPosts.length === 0) {
                   return (
                     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
                       <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
@@ -1282,12 +1706,12 @@ export default function App() {
                   );
                 }
 
-                if (error && posts.length === 0) {
+                if (topicState?.error && !topicState.isLoading && topicPosts.length === 0) {
                   return (
                     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
                       <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-4">
-                        <p className="text-muted-foreground">{error}</p>
-                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                        <p className="text-muted-foreground">{topicState.error}</p>
+                        <Button variant="outline" size="sm" onClick={() => handleRetryTopic(topicKey)}>
                           Повторить попытку
                         </Button>
                       </div>
@@ -1298,7 +1722,7 @@ export default function App() {
                 return (
                   <TopicPage
                     topic={topicKey}
-                    posts={posts}
+                    posts={topicPosts}
                     countersById={countersById}
                     onViewPost={handleViewPost}
                     onPostUpdate={handlePostMetricsUpdate}

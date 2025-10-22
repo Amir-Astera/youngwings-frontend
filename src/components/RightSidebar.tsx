@@ -3,9 +3,10 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { fetchEvents } from "../lib/api";
+import { fetchPopularTopics, fetchTopUpcomingEvents } from "../lib/api";
 import { formatEventDate, formatEventTime } from "../lib/events";
 import type { EventResponse } from "../types/event";
+import type { PopularTopicsResponse } from "../lib/api";
 
 interface RightSidebarProps {
   onPageChange: (page: string) => void;
@@ -22,6 +23,11 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [isEventsLoading, setIsEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [popularTopics, setPopularTopics] = useState<{ name: string; count: number }[]>([]);
+  const [isTopicsLoading, setIsTopicsLoading] = useState(false);
+  const [topicsError, setTopicsError] = useState<string | null>(null);
+
+  const DEFAULT_TOPIC_COUNTS = [234, 189, 156, 142, 128];
 
   const handleShare = async (platform: string, title: string) => {
     const url = window.location.href;
@@ -77,14 +83,6 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
     }
   };
 
-  const popularTopics = [
-    { name: "Искусственный интеллект", count: 234 },
-    { name: "Стартапы", count: 189 },
-    { name: "Блокчейн", count: 156 },
-    { name: "Финтех", count: 142 },
-    { name: "EdTech", count: 128 },
-  ];
-
   useEffect(() => {
     const controller = new AbortController();
 
@@ -93,13 +91,13 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       setEventsError(null);
 
       try {
-        const response = await fetchEvents<EventResponse>({ page: 1, size: 5, signal: controller.signal });
+        const response = await fetchTopUpcomingEvents<EventResponse>({ size: 3, signal: controller.signal });
 
         if (controller.signal.aborted) {
           return;
         }
 
-        setEvents(Array.isArray(response.items) ? response.items : []);
+        setEvents(Array.isArray(response) ? response : []);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -116,6 +114,63 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
     };
 
     void loadEvents();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadTopics = async () => {
+      setIsTopicsLoading(true);
+      setTopicsError(null);
+
+      try {
+        const response: PopularTopicsResponse = await fetchPopularTopics({
+          page: 1,
+          size: DEFAULT_TOPIC_COUNTS.length,
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const normalizedTopics = Array.isArray(response.topics) ? response.topics : [];
+
+        if (normalizedTopics.length === 0) {
+          setPopularTopics([]);
+          return;
+        }
+
+        setPopularTopics(
+          normalizedTopics.map((topic, index) => ({
+            name: topic,
+            count:
+              DEFAULT_TOPIC_COUNTS[index] ??
+              DEFAULT_TOPIC_COUNTS[DEFAULT_TOPIC_COUNTS.length - 1] ??
+              0,
+          })),
+        );
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+
+        if (!controller.signal.aborted) {
+          setTopicsError("Не удалось загрузить популярные темы");
+          setPopularTopics([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsTopicsLoading(false);
+        }
+      }
+    };
+
+    void loadTopics();
 
     return () => {
       controller.abort();
@@ -205,9 +260,17 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
           <h3 className="text-sm">Популярные темы</h3>
         </div>
         <div ref={popularTopicsRef} className="space-y-3 max-h-[300px] overflow-y-auto scrollbar-hide">
-          {popularTopics.map((topic, index) => (
+          {isTopicsLoading && popularTopics.length === 0 && (
+            <p className="text-xs text-muted-foreground">Загрузка...</p>
+          )}
+
+          {topicsError && popularTopics.length === 0 && !isTopicsLoading && (
+            <p className="text-xs text-red-500">{topicsError}</p>
+          )}
+
+          {popularTopics.map((topic) => (
             <button
-              key={index}
+              key={topic.name}
               onClick={() => onPageChange(`topic-${topic.name}`)}
               className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors text-left"
             >
@@ -217,6 +280,10 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
               </span>
             </button>
           ))}
+
+          {!isTopicsLoading && !topicsError && popularTopics.length === 0 && (
+            <p className="text-xs text-muted-foreground">Темы недоступны</p>
+          )}
         </div>
       </div>
 
