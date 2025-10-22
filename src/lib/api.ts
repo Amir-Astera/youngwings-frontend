@@ -26,12 +26,16 @@ export function resolveApiUrl(path: string): string {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
+function ensureAssetsSegmentUppercase(value: string): string {
+  return value.replace(/(^|\/)assets(?=\/)/gi, (_, prefix: string) => `${prefix}ASSETS`);
+}
+
 export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaultPrefix?: string } = {}): string | undefined {
   if (!path) {
     return undefined;
   }
 
-  const trimmed = path.trim();
+  const trimmed = ensureAssetsSegmentUppercase(path.trim());
 
   if (!trimmed) {
     return undefined;
@@ -41,7 +45,7 @@ export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaul
     return trimmed;
   }
 
-  const sanitized = trimmed.replace(/^\/+/, "");
+  const sanitized = ensureAssetsSegmentUppercase(trimmed.replace(/^\/+/, ""));
 
   if (trimmed.startsWith("/")) {
     return resolveApiUrl(trimmed);
