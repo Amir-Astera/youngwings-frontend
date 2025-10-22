@@ -349,11 +349,16 @@ export async function fetchPostsByTopic<T>({
   };
 }
 
+export interface PopularTopicItem {
+  topic: string;
+  postCount: number;
+}
+
 export interface PopularTopicsResponse {
   totalTopics: number;
   page: number;
   size: number;
-  topics: string[];
+  items: PopularTopicItem[];
 }
 
 export async function fetchPopularTopics({
@@ -386,21 +391,33 @@ export async function fetchPopularTopics({
       totalTopics: 0,
       page,
       size,
-      topics: [],
+      items: [],
     };
   }
 
-  const normalizedTopics = Array.isArray(parsed.topics)
-    ? parsed.topics
-        .map((topic) => (typeof topic === "string" ? topic.trim() : ""))
-        .filter((topic) => topic !== "")
+  const normalizedItems = Array.isArray(parsed.items)
+    ? parsed.items
+        .map((item) => {
+          const topic = typeof item?.topic === "string" ? item.topic.trim() : "";
+          if (!topic) {
+            return null;
+          }
+
+          const postCount =
+            typeof item?.postCount === "number" && Number.isFinite(item.postCount)
+              ? Math.max(0, Math.round(item.postCount))
+              : 0;
+
+          return { topic, postCount };
+        })
+        .filter((item): item is PopularTopicItem => item !== null)
     : [];
 
   return {
-    totalTopics: typeof parsed.totalTopics === "number" ? parsed.totalTopics : normalizedTopics.length,
+    totalTopics: typeof parsed.totalTopics === "number" ? parsed.totalTopics : normalizedItems.length,
     page: typeof parsed.page === "number" ? parsed.page : page,
     size: typeof parsed.size === "number" ? parsed.size : size,
-    topics: normalizedTopics,
+    items: normalizedItems,
   };
 }
 

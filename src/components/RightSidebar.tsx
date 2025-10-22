@@ -8,6 +8,8 @@ import { formatEventDate, formatEventTime } from "../lib/events";
 import type { EventResponse } from "../types/event";
 import type { PopularTopicsResponse } from "../lib/api";
 
+const POPULAR_TOPICS_LIMIT = 5;
+
 interface RightSidebarProps {
   onPageChange: (page: string) => void;
   currentPage?: string;
@@ -26,8 +28,6 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
   const [popularTopics, setPopularTopics] = useState<{ name: string; count: number }[]>([]);
   const [isTopicsLoading, setIsTopicsLoading] = useState(false);
   const [topicsError, setTopicsError] = useState<string | null>(null);
-
-  const DEFAULT_TOPIC_COUNTS = [234, 189, 156, 142, 128];
 
   const handleShare = async (platform: string, title: string) => {
     const url = window.location.href;
@@ -130,7 +130,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       try {
         const response: PopularTopicsResponse = await fetchPopularTopics({
           page: 1,
-          size: DEFAULT_TOPIC_COUNTS.length,
+          size: POPULAR_TOPICS_LIMIT,
           signal: controller.signal,
         });
 
@@ -138,7 +138,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
           return;
         }
 
-        const normalizedTopics = Array.isArray(response.topics) ? response.topics : [];
+        const normalizedTopics = Array.isArray(response.items) ? response.items : [];
 
         if (normalizedTopics.length === 0) {
           setPopularTopics([]);
@@ -146,12 +146,9 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
         }
 
         setPopularTopics(
-          normalizedTopics.map((topic, index) => ({
-            name: topic,
-            count:
-              DEFAULT_TOPIC_COUNTS[index] ??
-              DEFAULT_TOPIC_COUNTS[DEFAULT_TOPIC_COUNTS.length - 1] ??
-              0,
+          normalizedTopics.map((topic) => ({
+            name: topic.topic,
+            count: topic.postCount,
           })),
         );
       } catch (err) {
