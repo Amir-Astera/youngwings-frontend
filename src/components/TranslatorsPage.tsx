@@ -59,7 +59,10 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
   const specialization = response.specialization?.trim();
   const location = response.location?.trim();
   const username = response.nickname?.trim();
-  const qrCode = resolveFileUrl(response.qrUrl ?? undefined, { defaultPrefix: "/api/files/assets" }) ?? undefined;
+  const qrCode =
+    resolveFileUrl(response.qrUrl ?? undefined, {
+      defaultPrefix: "/api/files/thumbnail/ASSETS",
+    }) ?? undefined;
 
   return {
     id: response.id,

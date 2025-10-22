@@ -51,5 +51,9 @@ export function getEventFormatLabel(value?: string | null): string | undefined {
 }
 
 export function getEventCoverUrl(event: Pick<EventResponse, "coverUrl">): string | undefined {
-  return resolveFileUrl(event.coverUrl ?? undefined, { defaultPrefix: "/api/files/assets" }) ?? undefined;
+  return (
+    resolveFileUrl(event.coverUrl ?? undefined, {
+      defaultPrefix: "/api/files/thumbnail/ASSETS",
+    }) ?? undefined
+  );
 }
