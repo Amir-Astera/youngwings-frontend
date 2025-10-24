@@ -380,6 +380,54 @@ function sanitizeSearchItem(item: unknown): SearchResultItem | null {
   };
 }
 
+function sanitizePostResponse(item: unknown): PostResponse | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Record<string, unknown>;
+  const idValue = raw.id ?? raw.postId;
+  let id: string | undefined;
+
+  if (typeof idValue === "string") {
+    id = idValue.trim();
+  } else if (typeof idValue === "number" && Number.isFinite(idValue)) {
+    id = String(idValue);
+  }
+
+  if (!id) {
+    return null;
+  }
+
+  const thumbnailValue = raw.thumbnail;
+  const normalizedThumbnail =
+    typeof thumbnailValue === "string"
+      ? thumbnailValue.trim()
+      : thumbnailValue === null
+        ? null
+        : undefined;
+
+  const contentValue = raw.content;
+
+  return {
+    id,
+    title: sanitizeString(raw.title) ?? "",
+    description: sanitizeString(raw.description),
+    thumbnail: normalizedThumbnail,
+    chapter: sanitizeString(raw.chapter),
+    topic: sanitizeString(raw.topic),
+    author: sanitizeString(raw.author),
+    content: typeof contentValue === "string" ? contentValue : undefined,
+    commentCount: sanitizeInteger(raw.commentCount),
+    likeCount: sanitizeInteger(raw.likeCount),
+    dislikeCount: sanitizeInteger(raw.dislikeCount),
+    viewCount: sanitizeInteger(raw.viewCount),
+    version: sanitizeInteger(raw.version),
+    createdAt: sanitizeString(raw.createdAt),
+    updatedAt: sanitizeString(raw.updatedAt),
+  };
+}
+
 export async function fetchAllPosts({
   page = 1,
   size = 20,
@@ -420,10 +468,9 @@ export async function fetchAllPosts({
   const normalizedPage = sanitizeInteger(parsed.page);
   const normalizedSize = sanitizeInteger(parsed.size);
   const sanitizedItems = Array.isArray(parsed.items)
-    ? parsed
-        .items
-        .map(sanitizeSearchItem)
-        .filter((item): item is SearchResultItem => Boolean(item))
+    ? parsed.items
+        .map(sanitizePostResponse)
+        .filter((item): item is PostResponse => Boolean(item))
     : [];
 
   return {
