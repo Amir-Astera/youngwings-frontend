@@ -1,5 +1,5 @@
 import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
-import type { SearchKind, SearchResponse } from "../types/search";
+import type { SearchKind, SearchResponse, SearchResultItem } from "../types/search";
 import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } from "../types/post";
 import { buildEventsUrl, buildPostUrl } from "./urls";
 
@@ -236,6 +236,46 @@ interface FetchTranslatorVacanciesOptions {
   signal?: AbortSignal;
 }
 
+function sanitizeNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function sanitizeInteger(value: unknown): number | undefined {
+  const parsed = sanitizeNumber(value);
+
+  if (typeof parsed === "number") {
+    const integer = Math.trunc(parsed);
+
+    if (Number.isFinite(integer)) {
+      return integer;
+    }
+  }
+
+  return undefined;
+}
+
+function sanitizeString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed ? trimmed : undefined;
+}
+
 function sanitizeSearchKinds(kinds?: SearchKind[] | SearchKind): string | undefined {
   if (!kinds) {
     return undefined;
@@ -264,6 +304,80 @@ function sanitizeSearchKinds(kinds?: SearchKind[] | SearchKind): string | undefi
   }
 
   return Array.from(new Set(normalized)).join(",");
+}
+
+function sanitizeSearchItem(item: unknown): SearchResultItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Record<string, unknown>;
+  const kindValue = sanitizeString(raw.kind);
+
+  if (!kindValue) {
+    return null;
+  }
+
+  const normalizedKind = kindValue.toUpperCase() as SearchKind;
+
+  if (!["POST", "EVENT", "TOPIC"].includes(normalizedKind)) {
+    return null;
+  }
+
+  const base = {
+    id: sanitizeString(raw.id),
+    kind: normalizedKind,
+    score: sanitizeNumber(raw.score),
+    createdAt: sanitizeString(raw.createdAt),
+    snippet: sanitizeString(raw.snippet),
+  } as const;
+
+  if (normalizedKind === "POST") {
+    return {
+      ...base,
+      kind: "POST",
+      title: sanitizeString(raw.title),
+      description: sanitizeString(raw.description),
+      topic: sanitizeString(raw.topic),
+      chapter: sanitizeString(raw.chapter),
+      thumbnail: sanitizeString(raw.thumbnail),
+      likeCount: sanitizeInteger(raw.likeCount),
+      viewCount: sanitizeInteger(raw.viewCount),
+      commentCount: sanitizeInteger(raw.commentCount),
+      author: sanitizeString(raw.author),
+    };
+  }
+
+  if (normalizedKind === "EVENT") {
+    return {
+      ...base,
+      kind: "EVENT",
+      title: sanitizeString(raw.title),
+      description: sanitizeString(raw.description),
+      location: sanitizeString(raw.location),
+      region: sanitizeString(raw.region),
+      sphere: sanitizeString(raw.sphere),
+      eventDate: sanitizeString(raw.eventDate),
+      eventTime: sanitizeString(raw.eventTime),
+      coverUrl: sanitizeString(raw.coverUrl),
+    };
+  }
+
+  const topic = sanitizeString(raw.topic) ?? sanitizeString(raw.title);
+
+  if (!topic) {
+    return null;
+  }
+
+  const postCount = sanitizeInteger(raw.postCount);
+
+  return {
+    ...base,
+    kind: "TOPIC",
+    topic,
+    title: sanitizeString(raw.title),
+    postCount: typeof postCount === "number" ? Math.max(0, postCount) : undefined,
+  };
 }
 
 export async function fetchAllPosts({
@@ -302,11 +416,21 @@ export async function fetchAllPosts({
     };
   }
 
+  const normalizedTotal = sanitizeInteger(parsed.total);
+  const normalizedPage = sanitizeInteger(parsed.page);
+  const normalizedSize = sanitizeInteger(parsed.size);
+  const sanitizedItems = Array.isArray(parsed.items)
+    ? parsed
+        .items
+        .map(sanitizeSearchItem)
+        .filter((item): item is SearchResultItem => Boolean(item))
+    : [];
+
   return {
-    total: typeof parsed.total === "number" ? parsed.total : 0,
-    page: typeof parsed.page === "number" ? parsed.page : page,
-    size: typeof parsed.size === "number" ? parsed.size : size,
-    items: Array.isArray(parsed.items) ? parsed.items : [],
+    total: typeof normalizedTotal === "number" ? Math.max(0, normalizedTotal) : 0,
+    page: typeof normalizedPage === "number" ? Math.max(1, normalizedPage) : page,
+    size: typeof normalizedSize === "number" && normalizedSize > 0 ? normalizedSize : size,
+    items: sanitizedItems,
   };
 }
 

@@ -388,7 +388,29 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
   };
 
   const renderTopics = (topics: SearchResultTopic[]) => {
-    if (!topics.length) {
+    const sanitizedTopics = topics
+      .map((topic) => {
+        const topicName = typeof topic.topic === "string" ? topic.topic.trim() : "";
+        const title = typeof topic.title === "string" ? topic.title.trim() : "";
+        const label = topicName || title;
+
+        if (!label) {
+          return null;
+        }
+
+        const postCount =
+          typeof topic.postCount === "number" && Number.isFinite(topic.postCount)
+            ? Math.max(0, Math.trunc(topic.postCount))
+            : 0;
+
+        return { topic, label, postCount };
+      })
+      .filter(
+        (value): value is { topic: SearchResultTopic; label: string; postCount: number } =>
+          value !== null,
+      );
+
+    if (!sanitizedTopics.length) {
       return null;
     }
 
@@ -396,24 +418,25 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-semibold text-foreground">Темы (совпадения)</h4>
-          <span className="text-xs text-muted-foreground">{topics.length}</span>
+          <span className="text-xs text-muted-foreground">{sanitizedTopics.length}</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {topics.map((topic) => {
-            const key = topic.id ?? topic.topic;
+          {sanitizedTopics.map(({ topic, label, postCount }) => {
+            const key = topic.id ?? label;
+
             return (
               <button
                 key={key}
                 type="button"
                 className="group inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary hover:text-primary"
                 onClick={() => {
-                  setQuery(topic.topic);
-                  setDebouncedQuery(topic.topic.trim());
+                  setQuery(label);
+                  setDebouncedQuery(label.trim());
                 }}
               >
-                <span>{topic.topic}</span>
+                <span>{label}</span>
                 <Badge variant="secondary" className="group-hover:border-primary/40 group-hover:bg-primary/10">
-                  {topic.postCount}
+                  {postCount}
                 </Badge>
               </button>
             );
