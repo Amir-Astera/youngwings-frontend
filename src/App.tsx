@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MobileMenu } from "./components/MobileMenu";
@@ -240,6 +240,7 @@ interface SectionPostsState {
 export default function App() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [viewingPost, setViewingPost] = useState(false);
+  const [translatorsSidebarFilters, setTranslatorsSidebarFilters] = useState<ReactNode | null>(null);
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [countersById, setCountersById] = useState<Record<string, PostCountersState>>({});
@@ -1623,7 +1624,9 @@ export default function App() {
 
               {currentPage === "exhibitions" && <ExhibitionsPage />}
 
-              {currentPage === "translators" && <TranslatorsPage />}
+              {currentPage === "translators" && (
+                <TranslatorsPage onSidebarFiltersChange={setTranslatorsSidebarFilters} />
+              )}
 
               {currentPage === "about" && <AboutPage />}
 
@@ -1747,7 +1750,9 @@ export default function App() {
                 onPageChange={setCurrentPage} 
                 currentPage={currentPage}
                 filterContent={
-                  currentPage === "exhibitions" ? (
+                  currentPage === "translators"
+                    ? translatorsSidebarFilters ?? undefined
+                    : currentPage === "exhibitions" ? (
                     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                       <h3 className="text-sm mb-4">Фильтры</h3>
                       <div className="mb-4">
