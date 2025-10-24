@@ -36,7 +36,8 @@ export interface SearchResultEvent extends SearchResultBase {
 export interface SearchResultTopic extends SearchResultBase {
   kind: "TOPIC";
   topic: string;
-  postCount: number;
+  title?: string | null;
+  postCount?: number | null;
 }
 
 export type SearchResultItem =
