@@ -1820,69 +1820,6 @@ export default function App() {
                         Применить
                       </button>
                     </div>
-                  ) : currentPage === "translators" ? (
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                      <h3 className="text-sm mb-4">Фильтры</h3>
-                      <div className="mb-4">
-                        <label className="text-xs text-muted-foreground mb-2 block">Поиск</label>
-                        <input
-                          type="text"
-                          placeholder="Имя или услуга..."
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
-                      </div>
-                      <div className="mb-4">
-                        <label className="text-xs text-muted-foreground mb-2 block">Язык (с)</label>
-                        <select size={4} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                          <option>Любой</option>
-                          <option>Русский</option>
-                          <option>Английский</option>
-                          <option>Казахский</option>
-                          <option>Китайский</option>
-                          <option>Турецкий</option>
-                          <option>Корейский</option>
-                          <option>Немецкий</option>
-                          <option>Французский</option>
-                        </select>
-                      </div>
-                      <div className="mb-4">
-                        <label className="text-xs text-muted-foreground mb-2 block">Язык (на)</label>
-                        <select size={4} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                          <option>Любой</option>
-                          <option>Русский</option>
-                          <option>Английский</option>
-                          <option>Казахский</option>
-                          <option>Китайский</option>
-                          <option>Турецкий</option>
-                          <option>Корейский</option>
-                          <option>Немецкий</option>
-                          <option>Французский</option>
-                        </select>
-                      </div>
-                      <div className="mb-4">
-                        <label className="text-xs text-muted-foreground mb-2 block">Тип услуги</label>
-                        <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
-                          <option>Все услуги</option>
-                          <option>Письменный перевод</option>
-                          <option>Устный перевод</option>
-                          <option>Синхронный перевод</option>
-                          <option>Технический перевод</option>
-                        </select>
-                      </div>
-                      <div className="mb-4">
-                        <label className="text-xs text-muted-foreground mb-2 block">Опыт работы</label>
-                        <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
-                          <option>Любой</option>
-                          <option>До 1 года</option>
-                          <option>1-3 года</option>
-                          <option>3-5 лет</option>
-                          <option>5+ лет</option>
-                        </select>
-                      </div>
-                      <button className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
-                        Применить
-                      </button>
-                    </div>
                   ) : undefined
                 }
               />
