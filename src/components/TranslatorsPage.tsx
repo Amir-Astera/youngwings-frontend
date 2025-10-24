@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Languages, MapPin, Clock, QrCode, User, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Label } from "./ui/label";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Checkbox } from "./ui/checkbox";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { fetchTranslatorVacancies, resolveFileUrl } from "../lib/api";
 import type { TranslatorResponse } from "../types/translator";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { Input } from "./ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "./ui/pagination";
 
 interface TranslatorItem {
   id: string;
@@ -128,19 +137,31 @@ export function TranslatorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedQR, setSelectedQR] = useState<string | null>(null);
   const [showUsername, setShowUsername] = useState<string | null>(null);
-  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [experienceQuery, setExperienceQuery] = useState("");
   const [languageFilters, setLanguageFilters] = useState<string[]>([]);
-  const [experienceFilter, setExperienceFilter] = useState<string>("all");
+  const [specializationFilters, setSpecializationFilters] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalTranslators, setTotalTranslators] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const loadTranslators = useCallback(
     async (signal?: AbortSignal) => {
       setIsLoading(true);
       setError(null);
 
+      const sizeToRequest = pageSize || DEFAULT_PAGE_SIZE;
+
       try {
         const response = await fetchTranslatorVacancies<TranslatorResponse>({
-          page: 1,
-          size: DEFAULT_PAGE_SIZE,
+          page: currentPage,
+          size: sizeToRequest,
+          q: searchQuery,
+          languages: languageFilters,
+          specialization: specializationFilters,
+          experience: experienceQuery,
+          location: locationQuery,
           signal,
         });
 
@@ -154,7 +175,19 @@ export function TranslatorsPage() {
               .map(mapTranslatorResponse)
           : [];
 
+        const resolvedTotal = typeof response.total === "number" ? response.total : mapped.length;
+        const resolvedSize =
+          typeof response.size === "number" && Number.isFinite(response.size)
+            ? Math.max(1, Math.round(response.size))
+            : sizeToRequest;
+
         setTranslators(mapped);
+        setTotalTranslators(resolvedTotal);
+        if (resolvedSize !== pageSize) {
+          setPageSize(resolvedSize);
+        }
+        setShowUsername(null);
+        setSelectedQR(null);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -169,7 +202,7 @@ export function TranslatorsPage() {
         }
       }
     },
-    [],
+    [currentPage, experienceQuery, languageFilters, locationQuery, pageSize, searchQuery, specializationFilters],
   );
 
   useEffect(() => {
@@ -182,62 +215,121 @@ export function TranslatorsPage() {
     };
   }, [loadTranslators]);
 
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const handleRetry = useCallback(() => {
     void loadTranslators();
   }, [loadTranslators]);
 
-  // Get unique locations and languages
-  const locations = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          translators
-            .map((translator) => translator.location)
-            .filter((location): location is string => Boolean(location)),
-        ),
+  // Get unique languages and specializations
+  const allLanguages = useMemo(() => {
+    const uniqueLanguages = Array.from(
+      new Set(
+        translators
+          .flatMap((translator) => translator.languages)
+          .map((lang) => lang.trim())
+          .filter((lang) => lang.length > 0),
       ),
-    [translators],
-  );
-  const allLanguages = useMemo(
-    () => Array.from(new Set(translators.flatMap((translator) => translator.languages))),
-    [translators],
-  );
+    );
+
+    return uniqueLanguages.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
+
+  const allSpecializations = useMemo(() => {
+    const uniqueSpecializations = Array.from(
+      new Set(
+        translators
+          .map((translator) => translator.specialization?.trim())
+          .filter((specialization): specialization is string => Boolean(specialization)),
+      ),
+    );
+
+    return uniqueSpecializations.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
 
   // Toggle language filter
   const toggleLanguageFilter = (lang: string) => {
-    setLanguageFilters(prev => 
-      prev.includes(lang) 
-        ? prev.filter(l => l !== lang)
-        : [...prev, lang]
+    setLanguageFilters((prev) =>
+      prev.includes(lang) ? prev.filter((value) => value !== lang) : [...prev, lang],
     );
+    setCurrentPage(1);
   };
 
-  // Filter translators
-  const filteredTranslators = useMemo(() => {
-    return translators.filter((translator) => {
-      const locationMatch = locationFilter === "all" || translator.location === locationFilter;
-      const languageMatch =
-        languageFilters.length === 0 || languageFilters.some((lang) => translator.languages.includes(lang));
+  const toggleSpecializationFilter = (specialization: string) => {
+    setSpecializationFilters((prev) =>
+      prev.includes(specialization)
+        ? prev.filter((value) => value !== specialization)
+        : [...prev, specialization],
+    );
+    setCurrentPage(1);
+  };
 
-      let experienceMatch = true;
+  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+    setCurrentPage(1);
+  };
 
-      if (experienceFilter !== "all") {
-        const thresholds: Record<string, number> = {
-          "5+": 5,
-          "8+": 8,
-          "10+": 10,
-        };
+  const handleLocationChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setLocationQuery(event.target.value);
+    setCurrentPage(1);
+  };
 
-        const threshold = thresholds[experienceFilter];
+  const handleExperienceChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setExperienceQuery(event.target.value);
+    setCurrentPage(1);
+  };
 
-        if (threshold !== undefined) {
-          experienceMatch = (translator.experienceYears ?? 0) >= threshold;
-        }
-      }
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setLocationQuery("");
+    setExperienceQuery("");
+    setLanguageFilters([]);
+    setSpecializationFilters([]);
+    setCurrentPage(1);
+  };
 
-      return locationMatch && languageMatch && experienceMatch;
-    });
-  }, [experienceFilter, languageFilters, locationFilter, translators]);
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        searchQuery.trim() ||
+          locationQuery.trim() ||
+          experienceQuery.trim() ||
+          languageFilters.length ||
+          specializationFilters.length,
+      ),
+    [experienceQuery, languageFilters, locationQuery, searchQuery, specializationFilters],
+  );
+
+  const totalPages = useMemo(() => {
+    if (!pageSize || pageSize <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.ceil(totalTranslators / pageSize));
+  }, [pageSize, totalTranslators]);
+
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 1) {
+      return [] as number[];
+    }
+
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    start = Math.max(1, end - maxVisible + 1);
+
+    const pages: number[] = [];
+
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+
+    return pages;
+  }, [currentPage, totalPages]);
 
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
@@ -245,10 +337,10 @@ export function TranslatorsPage() {
         <div className="flex items-center justify-between mb-2">
           <h1>Переводчики и услуги</h1>
           
-          {/* Mobile Filter Button */}
+          {/* Filters Button */}
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="lg:hidden gap-2">
+              <Button variant="outline" size="sm" className="gap-2">
                 <SlidersHorizontal className="w-4 h-4" />
                 Фильтры
               </Button>
@@ -258,73 +350,78 @@ export function TranslatorsPage() {
                 <SheetTitle>Фильтры</SheetTitle>
               </SheetHeader>
               <div className="space-y-6 mt-6">
-                {/* Location Filter */}
-                <div>
-                  <Label className="text-sm mb-3 block">Локация</Label>
-                  <RadioGroup value={locationFilter} onValueChange={setLocationFilter}>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <RadioGroupItem value="all" id="location-all" />
-                      <Label htmlFor="location-all" className="text-sm cursor-pointer">Все</Label>
-                    </div>
-                    {locations.map((location, index) => (
-                      <div key={index} className="flex items-center space-x-2 mb-2">
-                        <RadioGroupItem value={location} id={`loc-${index}`} />
-                        <Label htmlFor={`loc-${index}`} className="text-sm cursor-pointer">{location}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                {/* Language Filter */}
-                <div>
-                  <Label className="text-sm mb-3 block">Языки</Label>
-                  <div className="space-y-2">
-                    {allLanguages.map((lang, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`lang-${index}`}
-                          checked={languageFilters.includes(lang)}
-                          onCheckedChange={() => toggleLanguageFilter(lang)}
-                        />
-                        <Label htmlFor={`lang-${index}`} className="text-sm cursor-pointer">{lang}</Label>
-                      </div>
-                    ))}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm mb-2 block">Поиск</Label>
+                    <Input
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      placeholder="Имя, язык или специализация"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm mb-2 block">Локация</Label>
+                    <Input
+                      value={locationQuery}
+                      onChange={handleLocationChange}
+                      placeholder="Например, Алматы"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm mb-2 block">Опыт</Label>
+                    <Input
+                      value={experienceQuery}
+                      onChange={handleExperienceChange}
+                      placeholder="Например, 5+ лет"
+                    />
                   </div>
                 </div>
 
-                {/* Experience Filter */}
                 <div>
-                  <Label className="text-sm mb-3 block">Опыт</Label>
-                  <RadioGroup value={experienceFilter} onValueChange={setExperienceFilter}>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <RadioGroupItem value="all" id="exp-all" />
-                      <Label htmlFor="exp-all" className="text-sm cursor-pointer">Все</Label>
+                  <Label className="text-sm mb-3 block">Языки</Label>
+                  {allLanguages.length > 0 ? (
+                    <div className="space-y-2">
+                      {allLanguages.map((lang, index) => (
+                        <div key={lang} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`sheet-lang-${index}`}
+                            checked={languageFilters.includes(lang)}
+                            onCheckedChange={() => toggleLanguageFilter(lang)}
+                          />
+                          <Label htmlFor={`sheet-lang-${index}`} className="text-sm cursor-pointer">
+                            {lang}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <RadioGroupItem value="5+" id="exp-5" />
-                      <Label htmlFor="exp-5" className="text-sm cursor-pointer">5+ лет</Label>
-                    </div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <RadioGroupItem value="8+" id="exp-8" />
-                      <Label htmlFor="exp-8" className="text-sm cursor-pointer">8+ лет</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="10+" id="exp-10" />
-                      <Label htmlFor="exp-10" className="text-sm cursor-pointer">10+ лет</Label>
-                    </div>
-                  </RadioGroup>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Нет данных о языках</p>
+                  )}
                 </div>
 
-                {/* Reset Button */}
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    setLocationFilter("all");
-                    setLanguageFilters([]);
-                    setExperienceFilter("all");
-                  }}
-                >
+                <div>
+                  <Label className="text-sm mb-3 block">Специализации</Label>
+                  {allSpecializations.length > 0 ? (
+                    <div className="space-y-2">
+                      {allSpecializations.map((specialization, index) => (
+                        <div key={specialization} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`sheet-spec-${index}`}
+                            checked={specializationFilters.includes(specialization)}
+                            onCheckedChange={() => toggleSpecializationFilter(specialization)}
+                          />
+                          <Label htmlFor={`sheet-spec-${index}`} className="text-sm cursor-pointer">
+                            {specialization}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Нет данных о специализациях</p>
+                  )}
+                </div>
+
+                <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
                   Сбросить фильтры
                 </Button>
               </div>
@@ -334,6 +431,26 @@ export function TranslatorsPage() {
         <p className="text-muted-foreground">
           Профессиональные переводчики и языковые услуги для вашего бизнеса
         </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div>
+          <Label className="text-sm mb-2 block">Поиск</Label>
+          <Input value={searchQuery} onChange={handleSearchChange} placeholder="Имя, язык или специализация" />
+        </div>
+        <div>
+          <Label className="text-sm mb-2 block">Локация</Label>
+          <Input value={locationQuery} onChange={handleLocationChange} placeholder="Например, Алматы" />
+        </div>
+        <div>
+          <Label className="text-sm mb-2 block">Опыт</Label>
+          <Input value={experienceQuery} onChange={handleExperienceChange} placeholder="Например, 5+ лет" />
+        </div>
+        <div className="flex items-end">
+          <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
+            Сбросить фильтры
+          </Button>
+        </div>
       </div>
 
       {/* Translators List */}
@@ -350,14 +467,14 @@ export function TranslatorsPage() {
               Повторить попытку
             </Button>
           </div>
-        ) : filteredTranslators.length === 0 ? (
+        ) : translators.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
             <p className="text-muted-foreground">
               Переводчики по выбранным фильтрам не найдены
             </p>
           </div>
         ) : (
-          filteredTranslators.map((translator) => (
+          translators.map((translator) => (
           <div
             key={translator.id}
             className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
@@ -528,6 +645,101 @@ export function TranslatorsPage() {
           </div>
         )))}
       </div>
+
+      {totalPages > 1 && (
+        <Pagination className="pt-2">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                aria-disabled={currentPage === 1}
+                tabIndex={currentPage === 1 ? -1 : undefined}
+                className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (currentPage > 1) {
+                    setCurrentPage((prev) => Math.max(1, prev - 1));
+                  }
+                }}
+              />
+            </PaginationItem>
+
+            {visiblePages.length > 0 && visiblePages[0] > 1 && (
+              <>
+                <PaginationItem>
+                  <PaginationLink
+                    href="#"
+                    isActive={currentPage === 1}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage(1);
+                    }}
+                  >
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+                {visiblePages[0] > 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+              </>
+            )}
+
+            {visiblePages.map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  href="#"
+                  isActive={currentPage === page}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setCurrentPage(page);
+                  }}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+
+            {visiblePages.length > 0 && visiblePages[visiblePages.length - 1] < totalPages && (
+              <>
+                {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+                <PaginationItem>
+                  <PaginationLink
+                    href="#"
+                    isActive={currentPage === totalPages}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage(totalPages);
+                    }}
+                  >
+                    {totalPages}
+                  </PaginationLink>
+                </PaginationItem>
+              </>
+            )}
+
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                aria-disabled={currentPage === totalPages}
+                tabIndex={currentPage === totalPages ? -1 : undefined}
+                className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (currentPage < totalPages) {
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                  }
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
 
       {/* Contact Section */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6 shadow-sm">
