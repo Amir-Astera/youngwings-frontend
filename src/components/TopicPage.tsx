@@ -45,9 +45,9 @@ export function TopicPage({
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
-        <h1 className="mb-2">{topicName}</h1>
-        <p className="text-muted-foreground">
+      <div className="rounded-xl p-6 bg-slate-900 text-slate-100 shadow-sm dark:bg-gray-900">
+        <h1 className="mb-2 text-slate-100">{topicName}</h1>
+        <p className="text-slate-300">
           Все материалы по теме "{topicName}"
         </p>
       </div>

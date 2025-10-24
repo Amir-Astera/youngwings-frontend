@@ -21,7 +21,7 @@ const POPULAR_TOPICS_ENDPOINT =
 const POST_COUNTERS_ENDPOINT = "/api/post/counters";
 const POST_COUNTERS_STREAM_ENDPOINT = "/api/post/live";
 const POST_MY_STATE_ENDPOINT = "/api/post/my-state";
-const CSRF_COOKIE_NAME = "yw_csrf";
+const CSRF_COOKIE_NAME = "ov_csrf";
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function resolveApiUrl(path: string): string {

@@ -196,7 +196,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {filterContent && filterContent}
 
       {/* Popular Topics */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm dark:bg-gray-900 dark:border-gray-700">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm">Популярные темы</h3>
@@ -214,10 +214,10 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
             <button
               key={topic.name}
               onClick={() => onPageChange(`topic-${topic.name}`)}
-              className="w-full flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors text-left"
+              className="w-full flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors text-left"
             >
               <span className="text-sm text-gray-700">{topic.name}</span>
-              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+              <span className="text-xs text-blue-700 bg-blue-600/15 px-2 py-0.5 rounded-full dark:bg-blue-500/20 dark:text-blue-200">
                 {topic.count}
               </span>
             </button>
@@ -287,13 +287,16 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       )}
 
       {/* Support Us */}
-      <div ref={supportBlockRef} className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-sm transition-all duration-300">
+      <div
+        ref={supportBlockRef}
+        className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm transition-all duration-300 dark:bg-gray-900 dark:border-gray-700"
+      >
         <div className="flex items-center gap-2 mb-3">
           <Heart className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm">Поддержите нас</h3>
         </div>
-        <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-          YoungWings — независимое издание. Ваша поддержка помогает нам создавать качественный контент.
+        <p className="text-xs text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+          OrientVentus — независимое издание. Ваша поддержка помогает нам создавать качественный контент.
         </p>
         <Button className="w-full bg-blue-600 hover:bg-blue-700">
           Поддержать проект
