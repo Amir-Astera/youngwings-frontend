@@ -205,6 +205,14 @@ export function TranslatorsPage() {
     [currentPage, experienceQuery, languageFilters, locationQuery, pageSize, searchQuery, specializationFilters],
   );
 
+  const totalPages = useMemo(() => {
+    if (!pageSize || pageSize <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.ceil(totalTranslators / pageSize));
+  }, [pageSize, totalTranslators]);
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -303,14 +311,6 @@ export function TranslatorsPage() {
       ),
     [experienceQuery, languageFilters, locationQuery, searchQuery, specializationFilters],
   );
-
-  const totalPages = useMemo(() => {
-    if (!pageSize || pageSize <= 0) {
-      return 0;
-    }
-
-    return Math.max(0, Math.ceil(totalTranslators / pageSize));
-  }, [pageSize, totalTranslators]);
 
   const visiblePages = useMemo(() => {
     if (totalPages <= 1) {
