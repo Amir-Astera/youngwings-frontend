@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, MapPin, Clock, Globe2, MapPinned } from "lucide-react";
+import { Calendar, MapPin, Globe2, MapPinned } from "lucide-react";
 import { Button } from "./ui/button";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { fetchEvents } from "../lib/api";
-import { formatEventDate, formatEventTime, getEventCoverUrl, getEventFormatLabel } from "../lib/events";
+import { formatEventDate, getEventCoverUrl, getEventFormatLabel } from "../lib/events";
 import type { EventResponse } from "../types/event";
 
 const PAGE_SIZE = 20;
@@ -59,7 +59,6 @@ export function EventsPage() {
     return events.map((event) => {
       const coverUrl = getEventCoverUrl(event);
       const eventDate = formatEventDate(event.eventDate);
-      const eventTime = formatEventTime(event.eventTime);
       const formatLabel = getEventFormatLabel(event.format);
 
       return (
@@ -93,13 +92,6 @@ export function EventsPage() {
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4 text-blue-600" />
                     <span>{eventDate}</span>
-                  </div>
-                )}
-
-                {eventTime && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                    <span>{eventTime}</span>
                   </div>
                 )}
 

@@ -372,7 +372,6 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
                 {date}
-                {item.eventTime ? ` · ${item.eventTime}` : ""}
               </span>
             )}
             {item.location && (

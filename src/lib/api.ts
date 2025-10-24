@@ -4,6 +4,7 @@ import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } 
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
+const EVENTS_ENDPOINT = import.meta.env.VITE_API_EVENTS_ENDPOINT ?? "/api/events";
 const UPCOMING_EVENTS_ENDPOINT =
   import.meta.env.VITE_API_UPCOMING_EVENTS_ENDPOINT ?? "/api/events/upcoming";
 const TOP_UPCOMING_EVENTS_ENDPOINT =
@@ -80,6 +81,16 @@ export function resolveFileUrl(path?: string | null, { defaultPrefix }: { defaul
   }
 
   return resolveApiUrl(`/${sanitized}`);
+}
+
+export function buildPostShareUrl(postId?: string | null): string | undefined {
+  const trimmedId = postId?.trim();
+
+  if (!trimmedId) {
+    return undefined;
+  }
+
+  return resolveApiUrl(`/api/post/share/${trimmedId}`);
 }
 
 function getCookie(name: string): string | null {
@@ -229,7 +240,7 @@ export async function fetchEvents<T>({
     size: String(size),
   });
 
-  const response = await apiRequest(`${UPCOMING_EVENTS_ENDPOINT}?${params.toString()}`, {
+  const response = await apiRequest(`${EVENTS_ENDPOINT}?${params.toString()}`, {
     method: "GET",
     signal,
   });

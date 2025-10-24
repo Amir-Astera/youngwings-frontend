@@ -1,14 +1,32 @@
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, MapPin, Clock, ChevronRight, Globe2 } from "lucide-react";
+import { Calendar, MapPin, ChevronRight, Globe2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { fetchEvents } from "../lib/api";
-import { formatEventDate, formatEventTime, getEventFormatLabel } from "../lib/events";
+import { formatEventDate, getEventFormatLabel } from "../lib/events";
 import type { EventResponse } from "../types/event";
 
 const PAGE_SIZE = 20;
 
 interface UpcomingEventsPageProps {
   onPageChange: (page: string) => void;
+}
+
+function isUpcomingEvent(eventDate?: string): boolean {
+  if (!eventDate) {
+    return true;
+  }
+
+  const eventDay = new Date(eventDate);
+
+  if (Number.isNaN(eventDay.getTime())) {
+    return true;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  eventDay.setHours(0, 0, 0, 0);
+
+  return eventDay >= today;
 }
 
 export function UpcomingEventsPage({ onPageChange }: UpcomingEventsPageProps) {
@@ -28,7 +46,8 @@ export function UpcomingEventsPage({ onPageChange }: UpcomingEventsPageProps) {
           return;
         }
 
-        setEvents(Array.isArray(response.items) ? response.items : []);
+        const items = Array.isArray(response.items) ? response.items : [];
+        setEvents(items.filter((event) => isUpcomingEvent(event.eventDate)));
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -92,7 +111,6 @@ export function UpcomingEventsPage({ onPageChange }: UpcomingEventsPageProps) {
         <div className="space-y-5">
           {events.map((event) => {
             const eventDate = formatEventDate(event.eventDate);
-            const eventTime = formatEventTime(event.eventTime);
             const formatLabel = getEventFormatLabel(event.format);
 
             return (
@@ -113,13 +131,6 @@ export function UpcomingEventsPage({ onPageChange }: UpcomingEventsPageProps) {
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="w-4 h-4 text-blue-600" />
                         <span>{eventDate}</span>
-                      </div>
-                    )}
-
-                    {eventTime && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Clock className="w-4 h-4 text-blue-600" />
-                        <span>{eventTime}</span>
                       </div>
                     )}
 
