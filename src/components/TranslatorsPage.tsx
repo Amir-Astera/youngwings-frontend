@@ -4,7 +4,6 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Label } from "./ui/label";
-import { Checkbox } from "./ui/checkbox";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { fetchTranslatorVacancies, resolveFileUrl } from "../lib/api";
 import type { TranslatorResponse } from "../types/translator";
@@ -138,30 +137,29 @@ export function TranslatorsPage() {
   const [selectedQR, setSelectedQR] = useState<string | null>(null);
   const [showUsername, setShowUsername] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [locationQuery, setLocationQuery] = useState("");
   const [experienceQuery, setExperienceQuery] = useState("");
-  const [languageFilters, setLanguageFilters] = useState<string[]>([]);
-  const [specializationFilters, setSpecializationFilters] = useState<string[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [selectedSpecialization, setSelectedSpecialization] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTranslators, setTotalTranslators] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const loadTranslators = useCallback(
-    async (signal?: AbortSignal) => {
+    async (signal?: AbortSignal, pageOverride?: number) => {
       setIsLoading(true);
       setError(null);
 
       const sizeToRequest = pageSize || DEFAULT_PAGE_SIZE;
+      const pageToRequest = pageOverride ?? currentPage;
 
       try {
         const response = await fetchTranslatorVacancies<TranslatorResponse>({
-          page: currentPage,
+          page: pageToRequest,
           size: sizeToRequest,
           q: searchQuery,
-          languages: languageFilters,
-          specialization: specializationFilters,
+          languages: selectedLanguage ? [selectedLanguage] : undefined,
+          specialization: selectedSpecialization ? [selectedSpecialization] : undefined,
           experience: experienceQuery,
-          location: locationQuery,
           signal,
         });
 
@@ -202,7 +200,7 @@ export function TranslatorsPage() {
         }
       }
     },
-    [currentPage, experienceQuery, languageFilters, locationQuery, pageSize, searchQuery, specializationFilters],
+    [currentPage, experienceQuery, pageSize, searchQuery, selectedLanguage, selectedSpecialization],
   );
 
   const totalPages = useMemo(() => {
@@ -259,44 +257,43 @@ export function TranslatorsPage() {
     return uniqueSpecializations.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
   }, [translators]);
 
-  // Toggle language filter
-  const toggleLanguageFilter = (lang: string) => {
-    setLanguageFilters((prev) =>
-      prev.includes(lang) ? prev.filter((value) => value !== lang) : [...prev, lang],
+  const allExperiences = useMemo(() => {
+    const uniqueExperiences = Array.from(
+      new Set(
+        translators
+          .map((translator) => translator.experience?.trim())
+          .filter((experience): experience is string => Boolean(experience)),
+      ),
     );
-    setCurrentPage(1);
-  };
 
-  const toggleSpecializationFilter = (specialization: string) => {
-    setSpecializationFilters((prev) =>
-      prev.includes(specialization)
-        ? prev.filter((value) => value !== specialization)
-        : [...prev, specialization],
-    );
-    setCurrentPage(1);
-  };
+    return uniqueExperiences.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
     setCurrentPage(1);
   };
 
-  const handleLocationChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setLocationQuery(event.target.value);
+  const handleLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLanguage(event.target.value);
     setCurrentPage(1);
   };
 
-  const handleExperienceChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleSpecializationChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSpecialization(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleExperienceChange = (event: ChangeEvent<HTMLSelectElement>) => {
     setExperienceQuery(event.target.value);
     setCurrentPage(1);
   };
 
   const handleResetFilters = () => {
     setSearchQuery("");
-    setLocationQuery("");
     setExperienceQuery("");
-    setLanguageFilters([]);
-    setSpecializationFilters([]);
+    setSelectedLanguage("");
+    setSelectedSpecialization("");
     setCurrentPage(1);
   };
 
@@ -304,12 +301,11 @@ export function TranslatorsPage() {
     () =>
       Boolean(
         searchQuery.trim() ||
-          locationQuery.trim() ||
           experienceQuery.trim() ||
-          languageFilters.length ||
-          specializationFilters.length,
+          selectedLanguage.trim() ||
+          selectedSpecialization.trim(),
       ),
-    [experienceQuery, languageFilters, locationQuery, searchQuery, specializationFilters],
+    [experienceQuery, searchQuery, selectedLanguage, selectedSpecialization],
   );
 
   const visiblePages = useMemo(() => {
@@ -350,75 +346,61 @@ export function TranslatorsPage() {
                 <SheetTitle>Фильтры</SheetTitle>
               </SheetHeader>
               <div className="space-y-6 mt-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm mb-2 block">Поиск</Label>
-                    <Input
-                      value={searchQuery}
-                      onChange={handleSearchChange}
-                      placeholder="Имя, язык или специализация"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm mb-2 block">Локация</Label>
-                    <Input
-                      value={locationQuery}
-                      onChange={handleLocationChange}
-                      placeholder="Например, Алматы"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm mb-2 block">Опыт</Label>
-                    <Input
-                      value={experienceQuery}
-                      onChange={handleExperienceChange}
-                      placeholder="Например, 5+ лет"
-                    />
-                  </div>
+                <div>
+                  <Label className="text-sm mb-2 block">Поиск</Label>
+                  <Input
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    placeholder="Имя или услуга..."
+                  />
                 </div>
 
                 <div>
-                  <Label className="text-sm mb-3 block">Языки</Label>
-                  {allLanguages.length > 0 ? (
-                    <div className="space-y-2">
-                      {allLanguages.map((lang, index) => (
-                        <div key={lang} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`sheet-lang-${index}`}
-                            checked={languageFilters.includes(lang)}
-                            onCheckedChange={() => toggleLanguageFilter(lang)}
-                          />
-                          <Label htmlFor={`sheet-lang-${index}`} className="text-sm cursor-pointer">
-                            {lang}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Нет данных о языках</p>
-                  )}
+                  <Label className="text-sm mb-2 block">Язык</Label>
+                  <select
+                    value={selectedLanguage}
+                    onChange={handleLanguageChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allLanguages.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <Label className="text-sm mb-3 block">Специализации</Label>
-                  {allSpecializations.length > 0 ? (
-                    <div className="space-y-2">
-                      {allSpecializations.map((specialization, index) => (
-                        <div key={specialization} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`sheet-spec-${index}`}
-                            checked={specializationFilters.includes(specialization)}
-                            onCheckedChange={() => toggleSpecializationFilter(specialization)}
-                          />
-                          <Label htmlFor={`sheet-spec-${index}`} className="text-sm cursor-pointer">
-                            {specialization}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Нет данных о специализациях</p>
-                  )}
+                  <Label className="text-sm mb-2 block">Тип услуги</Label>
+                  <select
+                    value={selectedSpecialization}
+                    onChange={handleSpecializationChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Все услуги</option>
+                    {allSpecializations.map((specialization) => (
+                      <option key={specialization} value={specialization}>
+                        {specialization}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-sm mb-2 block">Опыт работы</Label>
+                  <select
+                    value={experienceQuery}
+                    onChange={handleExperienceChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allExperiences.map((experience) => (
+                      <option key={experience} value={experience}>
+                        {experience}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
@@ -433,22 +415,79 @@ export function TranslatorsPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-        <div>
-          <Label className="text-sm mb-2 block">Поиск</Label>
-          <Input value={searchQuery} onChange={handleSearchChange} placeholder="Имя, язык или специализация" />
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <h3 className="text-sm mb-4">Фильтры</h3>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Поиск</Label>
+          <Input
+            value={searchQuery}
+            onChange={handleSearchChange}
+            placeholder="Имя или услуга..."
+          />
         </div>
-        <div>
-          <Label className="text-sm mb-2 block">Локация</Label>
-          <Input value={locationQuery} onChange={handleLocationChange} placeholder="Например, Алматы" />
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Язык</Label>
+          <select
+            value={selectedLanguage}
+            onChange={handleLanguageChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto"
+          >
+            <option value="">Любой</option>
+            {allLanguages.map((lang) => (
+              <option key={lang} value={lang}>
+                {lang}
+              </option>
+            ))}
+          </select>
         </div>
-        <div>
-          <Label className="text-sm mb-2 block">Опыт</Label>
-          <Input value={experienceQuery} onChange={handleExperienceChange} placeholder="Например, 5+ лет" />
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Тип услуги</Label>
+          <select
+            value={selectedSpecialization}
+            onChange={handleSpecializationChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Все услуги</option>
+            {allSpecializations.map((specialization) => (
+              <option key={specialization} value={specialization}>
+                {specialization}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="flex items-end">
-          <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
-            Сбросить фильтры
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Опыт работы</Label>
+          <select
+            value={experienceQuery}
+            onChange={handleExperienceChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любой</option>
+            {allExperiences.map((experience) => (
+              <option key={experience} value={experience}>
+                {experience}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            className="flex-1"
+            variant="default"
+            onClick={() => {
+              setCurrentPage(1);
+              void loadTranslators(undefined, 1);
+            }}
+          >
+            Применить
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+          >
+            Сбросить
           </Button>
         </div>
       </div>
