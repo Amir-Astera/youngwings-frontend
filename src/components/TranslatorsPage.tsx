@@ -431,7 +431,7 @@ export function TranslatorsPage() {
                     disabled={!translator.username}
                   >
                     <User className="w-4 h-4" />
-                    Показать никнейм
+                    Показать ватсап
                   </Button>
                 </div>
 
@@ -511,7 +511,7 @@ export function TranslatorsPage() {
                       disabled={!translator.username}
                     >
                       <User className="w-4 h-4" />
-                      Показать никнейм
+                      Показать ватсап
                     </Button>
                   </div>
 

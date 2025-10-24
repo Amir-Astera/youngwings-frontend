@@ -1,10 +1,9 @@
-import { Calendar, TrendingUp, Heart, Share2, Twitter, Facebook, Link2, MapPin, Clock } from "lucide-react";
+import { Calendar, TrendingUp, Heart, MapPin } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { fetchPopularTopics, fetchTopUpcomingEvents } from "../lib/api";
-import { formatEventDate, formatEventTime } from "../lib/events";
+import { formatEventDate } from "../lib/events";
 import type { EventResponse } from "../types/event";
 import type { PopularTopicsResponse } from "../lib/api";
 
@@ -28,60 +27,6 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
   const [popularTopics, setPopularTopics] = useState<{ name: string; count: number }[]>([]);
   const [isTopicsLoading, setIsTopicsLoading] = useState(false);
   const [topicsError, setTopicsError] = useState<string | null>(null);
-
-  const handleShare = async (platform: string, title: string) => {
-    const url = window.location.href;
-    
-    switch (platform) {
-      case "whatsapp":
-        window.open(`https://wa.me/?text=${encodeURIComponent(title + " " + url)}`, "_blank");
-        break;
-      case "instagram":
-        toast.info("Instagram не поддерживает прямое шаринг. Скопируйте ссылку!");
-        break;
-      case "twitter":
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`, "_blank");
-        break;
-      case "facebook":
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, "_blank");
-        break;
-      case "telegram":
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`, "_blank");
-        break;
-      case "tiktok":
-        toast.info("TikTok не поддерживает прямое шаринг. Скопируйте ссылку!");
-        break;
-      case "threads":
-        window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(title + " " + url)}`, "_blank");
-        break;
-      case "copy":
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(url);
-            toast.success("Ссылка скопирована!");
-          } else {
-            const textArea = document.createElement("textarea");
-            textArea.value = url;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-999999px";
-            textArea.style.top = "-999999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-              document.execCommand('copy');
-              toast.success("Ссылка скопирована!");
-            } catch (err) {
-              toast.error("Не удалось скопировать ссылку");
-            }
-            document.body.removeChild(textArea);
-          }
-        } catch (err) {
-          toast.error("Не удалось скопировать. URL: " + url);
-        }
-        break;
-    }
-  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -302,7 +247,6 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
 
             {events.map((event) => {
               const eventDate = formatEventDate(event.eventDate);
-              const eventTime = formatEventTime(event.eventTime);
 
               return (
                 <button
@@ -315,12 +259,6 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
                     <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-blue-600" />
                       <span>{eventDate}</span>
-                    </p>
-                  )}
-                  {eventTime && (
-                    <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-blue-600" />
-                      <span>{eventTime}</span>
                     </p>
                   )}
                   {event.location && (

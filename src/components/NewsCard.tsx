@@ -12,6 +12,7 @@ import {
   clearCommentReaction,
   clearPostReaction,
   createComment,
+  buildPostShareUrl,
   fetchComments,
   registerPostView,
   sendCommentDislike,
@@ -80,6 +81,13 @@ function getCommentAuthor(name?: string | null): string {
 
 const COMMENTS_PAGE_SIZE = 20;
 
+interface PendingComment {
+  id: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
 export function NewsCard({
   id,
   title,
@@ -119,6 +127,7 @@ export function NewsCard({
   const [commentsPage, setCommentsPage] = useState(1);
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [commentsList, setCommentsList] = useState<CommentResponse[]>([]);
+  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
   const [commentReactions, setCommentReactions] = useState<Record<string, { liked: boolean; disliked: boolean }>>({});
   const [reactionPendingByComment, setReactionPendingByComment] = useState<Record<string, boolean>>({});
   const [hasRegisteredView, setHasRegisteredView] = useState(
@@ -397,6 +406,7 @@ export function NewsCard({
     setFirstName("");
     setLastName("");
     setIsAnonymous(false);
+    setPendingComment(null);
     commentsAbortRef.current?.abort();
     commentsAbortRef.current = null;
   }, [id]);
@@ -406,6 +416,12 @@ export function NewsCard({
       commentsAbortRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (!showComments) {
+      setPendingComment(null);
+    }
+  }, [showComments]);
 
   const loadComments = useCallback(
     async ({ page, append = false }: { page: number; append?: boolean }) => {
@@ -704,15 +720,19 @@ export function NewsCard({
   );
 
   const handleAddComment = useCallback(async () => {
-    if (!newComment.trim()) {
+    const trimmedComment = newComment.trim();
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+
+    if (!trimmedComment) {
       toast.error("Введите текст комментария");
       return;
     }
 
     const payload = {
-      text: newComment.trim(),
-      name: isAnonymous ? null : firstName.trim() || null,
-      surname: isAnonymous ? null : lastName.trim() || null,
+      text: trimmedComment,
+      name: isAnonymous ? null : trimmedFirstName || null,
+      surname: isAnonymous ? null : trimmedLastName || null,
     };
 
     const nextTotal = commentCount + 1;
@@ -720,7 +740,18 @@ export function NewsCard({
     setIsSubmittingComment(true);
 
     try {
-      await createComment(id, payload);
+      const response = await createComment(id, payload);
+
+      const fallbackAuthor = isAnonymous
+        ? "Аноним"
+        : [trimmedFirstName, trimmedLastName].filter(Boolean).join(" ").trim() || "Аноним";
+
+      setPendingComment({
+        id: response?.id ?? `pending-${Date.now()}`,
+        authorName: response?.authorName ?? fallbackAuthor,
+        content: response?.content ?? trimmedComment,
+        createdAt: response?.createdAt ?? new Date().toISOString(),
+      });
 
       toast.success("Комментарий добавлен!");
       setNewComment("");
@@ -730,7 +761,7 @@ export function NewsCard({
 
       applyMetrics(undefined, { comments: nextTotal });
 
-      await loadComments({ page: 1 });
+      void loadComments({ page: 1 });
     } catch (error) {
       toast.error("Не удалось добавить комментарий. Попробуйте ещё раз.");
     } finally {
@@ -746,42 +777,50 @@ export function NewsCard({
     return num.toString();
   };
 
+  const shareLink = buildPostShareUrl(id);
+
   const handleShare = async (platform: string) => {
-    const url = window.location.href;
+    const shareUrl = shareLink ?? window.location.href;
     const text = title;
     
     switch (platform) {
       case "whatsapp":
-        window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, "_blank");
+        window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + shareUrl)}`, "_blank");
         break;
       case "instagram":
         toast.info("Instagram не поддерживает прямое шаринг. Скопируйте ссылку!");
         break;
       case "twitter":
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank");
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
+          "_blank",
+        );
         break;
       case "facebook":
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, "_blank");
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, "_blank");
         break;
       case "telegram":
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, "_blank");
+        window.open(
+          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`,
+          "_blank",
+        );
         break;
       case "tiktok":
         toast.info("TikTok не поддерживает прямое шаринг. Скопируйте ссылку!");
         break;
       case "threads":
-        window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(text + " " + url)}`, "_blank");
+        window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(text + " " + shareUrl)}`, "_blank");
         break;
       case "copy":
         try {
           // Try modern clipboard API first
           if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(url);
+            await navigator.clipboard.writeText(shareUrl);
             toast.success("Ссылка скопирована!");
           } else {
             // Fallback method for older browsers or restricted contexts
             const textArea = document.createElement("textarea");
-            textArea.value = url;
+            textArea.value = shareUrl;
             textArea.style.position = "fixed";
             textArea.style.left = "-999999px";
             textArea.style.top = "-999999px";
@@ -798,7 +837,7 @@ export function NewsCard({
           }
         } catch (err) {
           // If all else fails, show the URL
-          toast.error("Не удалось скопировать. URL: " + url);
+          toast.error("Не удалось скопировать. URL: " + shareUrl);
         }
         break;
     }
@@ -825,14 +864,26 @@ export function NewsCard({
           </div>
         </div>
 
-        <h3
-          className="mb-3 hover:text-primary transition-colors cursor-pointer font-semibold"
-          onClick={() => {
-            registerViewIfNeeded();
-            onViewPost?.();
-          }}
-        >
-          {title}
+        <h3 className="mb-3 font-semibold">
+          <a
+            href={shareLink ?? "#"}
+            className="block cursor-pointer transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-sm"
+            onClick={(event) => {
+              if (event.defaultPrevented) {
+                return;
+              }
+
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                return;
+              }
+
+              event.preventDefault();
+              registerViewIfNeeded();
+              onViewPost?.();
+            }}
+          >
+            {title}
+          </a>
         </h3>
 
         <p className={`text-sm text-muted-foreground leading-relaxed ${!isExpanded && "line-clamp-3"}`}>
@@ -1074,7 +1125,7 @@ export function NewsCard({
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Написать комментарий..."
+              placeholder="Написать комментарий...(Комментарии сперва проходит модерацию)"
               className="resize-none"
               rows={2}
               disabled={isSubmittingComment}
@@ -1100,6 +1151,19 @@ export function NewsCard({
 
             {!isCommentsLoading && !commentsError && commentsList.length === 0 && (
               <div className="text-sm text-muted-foreground">Комментариев пока нет</div>
+            )}
+
+            {pendingComment && (
+              <div className="bg-white p-3 rounded-lg border border-dashed border-primary/40">
+                <div className="flex items-start justify-between mb-1">
+                  <span className="text-sm">{getCommentAuthor(pendingComment.authorName)}</span>
+                  <span className="text-xs text-blue-600">На модерации</span>
+                </div>
+                <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{pendingComment.content}</p>
+                <div className="text-xs text-muted-foreground">
+                  Комментарий отправлен и будет опубликован после проверки
+                </div>
+              </div>
             )}
 
             {commentsList.map((comment) => {

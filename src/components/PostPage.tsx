@@ -24,6 +24,7 @@ import {
   clearCommentReaction,
   clearPostReaction,
   createComment,
+  buildPostShareUrl,
   fetchComments,
   registerPostView,
   sendCommentDislike,
@@ -45,6 +46,13 @@ interface PostPageProps {
 }
 
 const COMMENTS_PAGE_SIZE = 20;
+
+interface PendingComment {
+  id: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
 
 function getCommentDisplayDate(createdAt?: string): string {
   if (!createdAt) {
@@ -89,6 +97,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
   const [commentCount, setCommentCount] = useState(postData?.comments ?? 0);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<CommentResponse[]>([]);
+  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
   const [commentReactions, setCommentReactions] = useState<Record<string, { liked: boolean; disliked: boolean }>>({});
   const [reactionPendingByComment, setReactionPendingByComment] = useState<Record<string, boolean>>({});
   const [newComment, setNewComment] = useState("");
@@ -126,6 +135,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
     setFirstName("");
     setLastName("");
     setIsAnonymous(false);
+    setPendingComment(null);
     commentsAbortRef.current?.abort();
     commentsAbortRef.current = null;
     const alreadyViewed = hasViewBeenRecorded(postId) || Boolean(initialHasViewed);
@@ -307,9 +317,13 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
         const nextPage = typeof response.page === "number" ? response.page : page;
         const size = typeof response.size === "number" ? response.size : COMMENTS_PAGE_SIZE;
         const total = typeof response.total === "number" ? response.total : items.length;
+        let nextCountValue = total;
 
         setCommentsPage(nextPage);
-        setCommentCount(total);
+        setCommentCount((previous) => {
+          nextCountValue = Math.max(previous, total);
+          return nextCountValue;
+        });
         setHasMoreComments(total > nextPage * size);
 
         setCommentReactions((previous) => {
@@ -325,7 +339,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
         });
 
         if (postId && onPostUpdate) {
-          onPostUpdate(postId, { comments: total });
+          onPostUpdate(postId, { comments: nextCountValue });
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
@@ -353,6 +367,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
   useEffect(() => {
     if (!showComments) {
       commentsAbortRef.current?.abort();
+      setPendingComment(null);
       return;
     }
 
@@ -677,39 +692,45 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
   };
 
   const handleShare = async (platform: string) => {
-    const url = window.location.href;
+    const shareUrl = buildPostShareUrl(postData?.id) ?? window.location.href;
     const text = postData?.title || "Публикация YoungWings";
 
     switch (platform) {
       case "whatsapp":
-        window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, "_blank");
+        window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + shareUrl)}`, "_blank");
         break;
       case "instagram":
         toast.info("Instagram не поддерживает прямое шаринг. Скопируйте ссылку!");
         break;
       case "twitter":
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank");
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
+          "_blank",
+        );
         break;
       case "facebook":
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, "_blank");
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, "_blank");
         break;
       case "telegram":
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, "_blank");
+        window.open(
+          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`,
+          "_blank",
+        );
         break;
       case "tiktok":
         toast.info("TikTok не поддерживает прямое шаринг. Скопируйте ссылку!");
         break;
       case "threads":
-        window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(text + " " + url)}`, "_blank");
+        window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(text + " " + shareUrl)}`, "_blank");
         break;
       case "copy":
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(url);
+            await navigator.clipboard.writeText(shareUrl);
             toast.success("Ссылка скопирована!");
           } else {
             const textArea = document.createElement("textarea");
-            textArea.value = url;
+            textArea.value = shareUrl;
             textArea.style.position = "fixed";
             textArea.style.left = "-999999px";
             textArea.style.top = "-999999px";
@@ -725,7 +746,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
             document.body.removeChild(textArea);
           }
         } catch (err) {
-          toast.error("Не удалось скопировать. URL: " + url);
+          toast.error("Не удалось скопировать. URL: " + shareUrl);
         }
         break;
     }
@@ -737,20 +758,24 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
       return;
     }
 
-    if (!newComment.trim()) {
+    const trimmedComment = newComment.trim();
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+
+    if (!trimmedComment) {
       toast.error("Пожалуйста, введите комментарий");
       return;
     }
 
-    if (!isAnonymous && (!firstName.trim() || !lastName.trim())) {
+    if (!isAnonymous && (!trimmedFirstName || !trimmedLastName)) {
       toast.error("Пожалуйста, введите имя и фамилию");
       return;
     }
 
     const payload = {
-      text: newComment.trim(),
-      name: isAnonymous ? null : firstName.trim() || null,
-      surname: isAnonymous ? null : lastName.trim() || null,
+      text: trimmedComment,
+      name: isAnonymous ? null : trimmedFirstName || null,
+      surname: isAnonymous ? null : trimmedLastName || null,
     };
 
     const nextTotal = commentCount + 1;
@@ -762,7 +787,18 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
         throw new Error("Нет идентификатора публикации");
       }
 
-      await createComment(postId, payload);
+      const response = await createComment(postId, payload);
+
+      const fallbackAuthor = isAnonymous
+        ? "Аноним"
+        : [trimmedFirstName, trimmedLastName].filter(Boolean).join(" ").trim() || "Аноним";
+
+      setPendingComment({
+        id: response?.id ?? `pending-${Date.now()}`,
+        authorName: response?.authorName ?? fallbackAuthor,
+        content: response?.content ?? trimmedComment,
+        createdAt: response?.createdAt ?? new Date().toISOString(),
+      });
 
       toast.success("Комментарий добавлен!");
       setNewComment("");
@@ -775,13 +811,13 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
         onPostUpdate(postId, { comments: nextTotal });
       }
 
-      await loadComments({ page: 1 });
+      void loadComments({ page: 1 });
     } catch (error) {
       toast.error("Не удалось добавить комментарий. Попробуйте ещё раз.");
     } finally {
       setIsSubmittingComment(false);
     }
-  }, [commentCount, firstName, isAnonymous, lastName, loadComments, newComment, onPostUpdate, postId]);
+  }, [commentCount, firstName, isAnonymous, lastName, loadComments, newComment, onPostUpdate, postData?.id, postId]);
 
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
@@ -1000,7 +1036,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
               <Textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Написать комментарий..."
+                placeholder="Написать комментарий...(Комментарии сперва проходит модерацию)"
                 className="resize-none"
                 rows={2}
                 disabled={isSubmittingComment}
@@ -1026,6 +1062,19 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
 
               {!isCommentsLoading && !commentsError && comments.length === 0 && (
                 <div className="text-sm text-muted-foreground">Комментариев пока нет</div>
+              )}
+
+              {pendingComment && (
+                <div className="bg-white p-3 rounded-lg border border-dashed border-primary/40">
+                  <div className="flex items-start justify-between mb-1">
+                    <span className="text-sm">{getCommentAuthor(pendingComment.authorName)}</span>
+                    <span className="text-xs text-blue-600">На модерации</span>
+                  </div>
+                  <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{pendingComment.content}</p>
+                  <div className="text-xs text-muted-foreground">
+                    Комментарий отправлен и будет опубликован после проверки
+                  </div>
+                </div>
               )}
 
               {comments.map((comment) => {

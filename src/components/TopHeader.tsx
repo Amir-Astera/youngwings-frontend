@@ -39,7 +39,7 @@ export function TopHeader() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-[90vw] sm:w-[720px] p-0"
+                className="w-[min(90vw,560px)] sm:w-[520px] p-0"
                 align="end"
                 sideOffset={8}
               >
