@@ -138,7 +138,8 @@ export function TranslatorsPage() {
   const [showUsername, setShowUsername] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [experienceQuery, setExperienceQuery] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [sourceLanguage, setSourceLanguage] = useState("");
+  const [targetLanguage, setTargetLanguage] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTranslators, setTotalTranslators] = useState(0);
@@ -153,11 +154,15 @@ export function TranslatorsPage() {
       const pageToRequest = pageOverride ?? currentPage;
 
       try {
+        const languagesFilter = [sourceLanguage, targetLanguage]
+          .map((language) => language.trim())
+          .filter((language, index, array) => language.length > 0 && array.indexOf(language) === index);
+
         const response = await fetchTranslatorVacancies<TranslatorResponse>({
           page: pageToRequest,
           size: sizeToRequest,
           q: searchQuery,
-          languages: selectedLanguage ? [selectedLanguage] : undefined,
+          languages: languagesFilter.length > 0 ? languagesFilter : undefined,
           specialization: selectedSpecialization ? [selectedSpecialization] : undefined,
           experience: experienceQuery,
           signal,
@@ -200,7 +205,15 @@ export function TranslatorsPage() {
         }
       }
     },
-    [currentPage, experienceQuery, pageSize, searchQuery, selectedLanguage, selectedSpecialization],
+    [
+      currentPage,
+      experienceQuery,
+      pageSize,
+      searchQuery,
+      sourceLanguage,
+      targetLanguage,
+      selectedSpecialization,
+    ],
   );
 
   const totalPages = useMemo(() => {
@@ -274,8 +287,13 @@ export function TranslatorsPage() {
     setCurrentPage(1);
   };
 
-  const handleLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedLanguage(event.target.value);
+  const handleSourceLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSourceLanguage(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleTargetLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setTargetLanguage(event.target.value);
     setCurrentPage(1);
   };
 
@@ -292,7 +310,8 @@ export function TranslatorsPage() {
   const handleResetFilters = () => {
     setSearchQuery("");
     setExperienceQuery("");
-    setSelectedLanguage("");
+    setSourceLanguage("");
+    setTargetLanguage("");
     setSelectedSpecialization("");
     setCurrentPage(1);
   };
@@ -302,10 +321,11 @@ export function TranslatorsPage() {
       Boolean(
         searchQuery.trim() ||
           experienceQuery.trim() ||
-          selectedLanguage.trim() ||
+          sourceLanguage.trim() ||
+          targetLanguage.trim() ||
           selectedSpecialization.trim(),
       ),
-    [experienceQuery, searchQuery, selectedLanguage, selectedSpecialization],
+    [experienceQuery, searchQuery, selectedSpecialization, sourceLanguage, targetLanguage],
   );
 
   const visiblePages = useMemo(() => {
@@ -356,10 +376,26 @@ export function TranslatorsPage() {
                 </div>
 
                 <div>
-                  <Label className="text-sm mb-2 block">Язык</Label>
+                  <Label className="text-sm mb-2 block">Язык (с)</Label>
                   <select
-                    value={selectedLanguage}
-                    onChange={handleLanguageChange}
+                    value={sourceLanguage}
+                    onChange={handleSourceLanguageChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allLanguages.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-sm mb-2 block">Язык (на)</Label>
+                  <select
+                    value={targetLanguage}
+                    onChange={handleTargetLanguageChange}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                   >
                     <option value="">Любой</option>
@@ -728,10 +764,25 @@ export function TranslatorsPage() {
               />
             </div>
             <div className="mb-4">
-              <Label className="text-xs text-muted-foreground mb-2 block">Язык</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">Язык (с)</Label>
               <select
-                value={selectedLanguage}
-                onChange={handleLanguageChange}
+                value={sourceLanguage}
+                onChange={handleSourceLanguageChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto"
+              >
+                <option value="">Любой</option>
+                {allLanguages.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-4">
+              <Label className="text-xs text-muted-foreground mb-2 block">Язык (на)</Label>
+              <select
+                value={targetLanguage}
+                onChange={handleTargetLanguageChange}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto"
               >
                 <option value="">Любой</option>
