@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
+import { ZoomableImage } from "./ZoomableImage";
 
 interface TipTapNode {
   type?: string;
@@ -158,7 +159,15 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
         return null;
       }
 
-      return <img key={key} src={src} alt={alt} className="rounded-xl w-full object-cover" />;
+      return (
+        <ZoomableImage
+          key={key}
+          src={src}
+          alt={alt}
+          className="overflow-hidden rounded-xl"
+          fullImageClassName="rounded-xl"
+        />
+      );
     }
     case "hardBreak":
       return <br key={key} />;
