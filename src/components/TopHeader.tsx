@@ -1,15 +1,18 @@
-import { Search, Mail } from "lucide-react";
+import { Search, Mail, Sun, Moon } from "lucide-react";
 import { useState } from "react";
 
 import { SearchPanel } from "./SearchPanel";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { useTheme } from "../lib/theme";
 
 export function TopHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-colors">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
         <div className="flex lg:grid lg:grid-cols-[240px_1fr_380px] gap-2 sm:gap-4 lg:gap-8 h-14 items-center">
           {/* Logo - aligned with left sidebar */}
@@ -27,6 +30,16 @@ export function TopHeader() {
 
           {/* Action buttons - aligned with right sidebar */}
           <div className="flex justify-end gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-gray-200 dark:border-transparent"
+              onClick={toggleTheme}
+              aria-label={isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"}
+              title={isDark ? "Светлая тема" : "Тёмная тема"}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
             <Popover open={searchOpen} onOpenChange={setSearchOpen}>
               <PopoverTrigger asChild>
                 <Button
