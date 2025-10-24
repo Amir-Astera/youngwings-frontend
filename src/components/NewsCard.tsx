@@ -5,7 +5,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner";
 import { TipTapContent } from "./TipTapContent";
 import { cn } from "./ui/utils";
@@ -906,13 +905,12 @@ export function NewsCard({
 
       {typeof image === "string" && image.trim() !== "" && (
         <div className="px-5 pb-4">
-          <div className="relative aspect-[16/9] overflow-hidden rounded-xl">
-            <ImageWithFallback
-              src={image}
-              alt={title}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-            />
-          </div>
+          <ZoomableImage
+            src={image}
+            alt={title}
+            className="relative aspect-[16/9] overflow-hidden rounded-xl"
+            fullImageClassName="rounded-xl"
+          />
         </div>
       )}
 

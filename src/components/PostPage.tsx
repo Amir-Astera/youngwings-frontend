@@ -15,9 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner";
 import { TipTapContent } from "./TipTapContent";
+import { ZoomableImage } from "./ZoomableImage";
 import type { PostPersonalState, PostSummary, PostResponse } from "../types/post";
 import type { CommentResponse } from "../types/comment";
 import {
@@ -854,13 +854,12 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
 
         {postData?.image && (
           <div className="px-5 pb-4">
-            <div className="relative aspect-[16/9] overflow-hidden rounded-xl">
-              <ImageWithFallback
-                src={postData.image}
-                alt={postData.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
+            <ZoomableImage
+              src={postData.image}
+              alt={postData.title}
+              className="relative aspect-[16/9] overflow-hidden rounded-xl"
+              fullImageClassName="rounded-xl"
+            />
           </div>
         )}
 

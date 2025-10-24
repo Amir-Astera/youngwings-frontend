@@ -49,6 +49,40 @@ export function buildPostUrl(postId: string, origin?: string): string {
   return path;
 }
 
+function getBasePathWithLeadingSlash(): string {
+  const normalizedBase = basePath || "/";
+
+  return ensureLeadingSlash(normalizedBase).replace(/\/{2,}/g, "/");
+}
+
+export function buildEventsPath(eventId?: string | null): string {
+  const normalizedBase = getBasePathWithLeadingSlash();
+  const params = new URLSearchParams();
+
+  params.set("section", "events");
+
+  const trimmedId = eventId?.trim();
+
+  if (trimmedId) {
+    params.set("event", trimmedId);
+  }
+
+  const query = params.toString();
+
+  return query ? `${normalizedBase}?${query}` : normalizedBase;
+}
+
+export function buildEventsUrl(eventId?: string | null, origin?: string): string {
+  const path = buildEventsPath(eventId);
+  const resolvedOrigin = resolveOrigin(origin);
+
+  if (resolvedOrigin) {
+    return `${resolvedOrigin}${path}`;
+  }
+
+  return path;
+}
+
 interface LocationLike {
   pathname: string;
   search: string;
