@@ -7,7 +7,7 @@ import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { toast } from "sonner";
 import { TipTapContent } from "./TipTapContent";
-import { ZoomableImage } from "./ZoomableImage";
+import { cn } from "./ui/utils";
 import {
   clearCommentReaction,
   clearPostReaction,
@@ -950,11 +950,15 @@ export function NewsCard({
               size="sm"
               onClick={handleLike}
               disabled={isReactionPending}
-              className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
-                isLiked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
-              }`}
+              className={cn(
+                "gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors",
+                "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                isLiked && "text-primary hover:text-primary",
+              )}
             >
-              <ThumbsUp className={`w-4 h-4 ${isLiked ? "fill-blue-600" : ""}`} />
+              <ThumbsUp
+                className={cn("w-4 h-4", isLiked ? "fill-current text-primary" : "text-inherit")}
+              />
               <span className="text-sm">{likeCount}</span>
             </Button>
             <Button
@@ -962,18 +966,22 @@ export function NewsCard({
               size="sm"
               onClick={handleDislike}
               disabled={isReactionPending}
-              className={`gap-1 h-8 px-1.5 sm:px-2 hover:bg-primary/5 ${
-                isDisliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
-              }`}
+              className={cn(
+                "gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors",
+                "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                isDisliked && "text-destructive hover:text-destructive",
+              )}
             >
-              <ThumbsDown className={`w-4 h-4 ${isDisliked ? "fill-red-600" : ""}`} />
+              <ThumbsDown
+                className={cn("w-4 h-4", isDisliked ? "fill-current text-destructive" : "text-inherit")}
+              />
               <span className="text-sm">{dislikeCount}</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowComments((value) => !value)}
-              className="gap-1 h-8 px-1.5 sm:px-2 hover:text-primary hover:bg-primary/5"
+              className="gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10"
             >
               <MessageCircle className="w-4 h-4" />
               <span className="text-sm">{commentCount}</span>
@@ -984,7 +992,11 @@ export function NewsCard({
             </div>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1 h-8 px-1.5 sm:px-2 hover:text-primary hover:bg-primary/5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10"
+                >
                   <Share2 className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
@@ -1194,11 +1206,18 @@ export function NewsCard({
                       size="sm"
                       onClick={() => handleCommentLike(comment.id)}
                       disabled={isPending}
-                      className={`gap-1.5 h-7 px-2 text-xs ${
-                        reaction.liked ? "text-blue-600 hover:text-blue-700" : "hover:text-primary"
-                      }`}
+                      className={cn(
+                        "gap-1.5 h-7 px-2 text-xs text-muted-foreground transition-colors",
+                        "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                        reaction.liked && "text-primary hover:text-primary",
+                      )}
                     >
-                      <ThumbsUp className={`w-3 h-3 ${reaction.liked ? "fill-blue-600" : ""}`} />
+                      <ThumbsUp
+                        className={cn(
+                          "w-3 h-3",
+                          reaction.liked ? "fill-current text-primary" : "text-inherit",
+                        )}
+                      />
                       <span>{comment.likeCount ?? 0}</span>
                     </Button>
                     <Button
@@ -1206,11 +1225,18 @@ export function NewsCard({
                       size="sm"
                       onClick={() => handleCommentDislike(comment.id)}
                       disabled={isPending}
-                      className={`gap-1.5 h-7 px-2 text-xs ${
-                        reaction.disliked ? "text-red-600 hover:text-red-700" : "hover:text-primary"
-                      }`}
+                      className={cn(
+                        "gap-1.5 h-7 px-2 text-xs text-muted-foreground transition-colors",
+                        "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                        reaction.disliked && "text-destructive hover:text-destructive",
+                      )}
                     >
-                      <ThumbsDown className={`w-3 h-3 ${reaction.disliked ? "fill-red-600" : ""}`} />
+                      <ThumbsDown
+                        className={cn(
+                          "w-3 h-3",
+                          reaction.disliked ? "fill-current text-destructive" : "text-inherit",
+                        )}
+                      />
                       <span>{comment.dislikeCount ?? 0}</span>
                     </Button>
                   </div>
