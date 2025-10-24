@@ -57,8 +57,8 @@ export function ContactsPage() {
                 </div>
                 <div>
                   <p className="text-sm mb-1">Email</p>
-                  <a href="mailto:info@youngwings.kz" className="text-sm text-blue-600 hover:underline">
-                    info@youngwings.kz
+                  <a href="mailto:info@orientventus.kz" className="text-sm text-blue-600 hover:underline">
+                    info@orientventus.kz
                   </a>
                 </div>
               </div>
@@ -94,8 +94,8 @@ export function ContactsPage() {
                 </div>
                 <div>
                   <p className="text-sm mb-1">Telegram</p>
-                  <a href="https://t.me/youngwings_kz" className="text-sm text-orange-600 hover:underline">
-                    @youngwings_kz
+                  <a href="https://t.me/orientventus_kz" className="text-sm text-orange-600 hover:underline">
+                    @orientventus_kz
                   </a>
                 </div>
               </div>
@@ -128,7 +128,7 @@ export function ContactsPage() {
               <div>
                 <p className="text-sm mb-1">Как стать автором?</p>
                 <p className="text-xs text-gray-600">
-                  Отправьте заявку на info@youngwings.kz с примерами ваших работ
+                  Отправьте заявку на info@orientventus.kz с примерами ваших работ
                 </p>
               </div>
               <div>

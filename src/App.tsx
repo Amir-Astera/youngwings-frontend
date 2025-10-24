@@ -2059,7 +2059,7 @@ export default function App() {
         <footer className="border-t border-gray-200 mt-16 bg-white">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8">
             <div className="text-center text-sm text-muted-foreground">
-              <p>© 2025 YoungWings. Все права защищены.</p>
+              <p>© 2025 OrientVentus. Все права защищены.</p>
             </div>
           </div>
         </footer>

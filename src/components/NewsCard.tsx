@@ -862,10 +862,10 @@ export function NewsCard({
       <div className="p-5 pb-4">
         <div className="flex items-start gap-3 mb-3">
           <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-lg">YW</span>
+            <span className="text-white text-lg">OV</span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-gray-900 mb-0.5">YoungWings</div>
+            <div className="text-sm text-gray-900 mb-0.5">OrientVentus</div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               {metaItems.map((item, index) => (
                 <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
@@ -1101,7 +1101,7 @@ export function NewsCard({
 
       {/* Comments Section */}
       {showComments && (
-        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50">
+        <div className="border-t border-gray-100 dark:border-gray-800 px-5 py-4 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm">Комментарии ({commentCount})</h4>
             <Button
@@ -1178,12 +1178,12 @@ export function NewsCard({
             )}
 
             {pendingComment && (
-              <div className="bg-white p-3 rounded-lg border border-dashed border-primary/40">
+              <div className="bg-white dark:bg-gray-900 p-3 rounded-lg border border-dashed border-primary/40">
                 <div className="flex items-start justify-between mb-1">
                   <span className="text-sm">{getCommentAuthor(pendingComment.authorName)}</span>
                   <span className="text-xs text-blue-600">На модерации</span>
                 </div>
-                <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{pendingComment.content}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-200 mb-2 whitespace-pre-line">{pendingComment.content}</p>
                 <div className="text-xs text-muted-foreground">
                   Комментарий отправлен и будет опубликован после проверки
                 </div>
@@ -1195,12 +1195,15 @@ export function NewsCard({
               const isPending = reactionPendingByComment[comment.id] === true;
 
               return (
-                <div key={comment.id} className="bg-white p-3 rounded-lg border border-gray-100">
+                <div
+                  key={comment.id}
+                  className="bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-100 dark:border-gray-700"
+                >
                   <div className="flex items-start justify-between mb-1">
                     <span className="text-sm">{getCommentAuthor(comment.authorName)}</span>
                     <span className="text-xs text-muted-foreground">{getCommentDisplayDate(comment.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{comment.content}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-200 mb-2 whitespace-pre-line">{comment.content}</p>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"

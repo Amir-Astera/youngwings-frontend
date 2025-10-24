@@ -803,9 +803,9 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
             </Pagination>
         )}
 
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm dark:bg-gray-900 dark:border-gray-700">
           <h3 className="mb-3">Нужна помощь с подбором переводчика?</h3>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
             Свяжитесь с нами, и мы поможем найти подходящего специалиста для вашего проекта
           </p>
           <Button className="gap-2">

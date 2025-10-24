@@ -6,7 +6,7 @@ export function AboutPage() {
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-gray-200 rounded-xl p-8">
-        <h1 className="mb-4">О проекте YoungWings</h1>
+        <h1 className="mb-4">О проекте OrientVentus</h1>
         <p className="text-lg text-gray-700 leading-relaxed">
           Новостная платформа для молодых предпринимателей, стартаперов и всех, кто интересуется миром технологий и инноваций
         </p>
@@ -19,7 +19,7 @@ export function AboutPage() {
           <div>
             <h3 className="mb-3">Наша история</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              YoungWings был создан в 2024 году с целью объединить молодых предпринимателей, разработчиков и 
+              OrientVentus был создан в 2024 году с целью объединить молодых предпринимателей, разработчиков и
               инноваторов Казахстана и Центральной Азии. Мы верим, что доступ к актуальной информации и качественному 
               контенту о технологиях и бизнесе — это ключ к развитию успешной стартап-экосистемы.
             </p>
@@ -102,7 +102,7 @@ export function AboutPage() {
 
           {/* Stats Section */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
-            <h4 className="mb-4 text-center">YoungWings в цифрах</h4>
+            <h4 className="mb-4 text-center">OrientVentus в цифрах</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-3xl text-blue-600 mb-1">15K+</div>
@@ -127,7 +127,7 @@ export function AboutPage() {
           <div>
             <h3 className="mb-3">Команда проекта</h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              YoungWings создается командой энтузиастов, которые верят в силу инноваций и предпринимательства. 
+              OrientVentus создается командой энтузиастов, которые верят в силу инноваций и предпринимательства.
               Мы работаем над тем, чтобы каждый материал на нашей платформе был полезным и вдохновляющим.
             </p>
             <div className="grid sm:grid-cols-2 gap-4">

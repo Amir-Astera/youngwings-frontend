@@ -8,13 +8,13 @@ interface ThemeContextValue {
   toggleTheme: () => void;
 }
 
-const THEME_STORAGE_KEY = "youngwings-theme";
+const THEME_STORAGE_KEY = "orientventus-theme";
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function getPreferredTheme(): Theme {
   if (typeof window === "undefined") {
-    return "light";
+    return "dark";
   }
 
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -23,7 +23,7 @@ function getPreferredTheme(): Theme {
     return stored;
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark";
 }
 
 function applyTheme(theme: Theme) {
@@ -38,7 +38,15 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => getPreferredTheme());
+  const [theme, setTheme] = useState<Theme>(() => {
+    const initialTheme = getPreferredTheme();
+
+    if (typeof document !== "undefined") {
+      applyTheme(initialTheme);
+    }
+
+    return initialTheme;
+  });
 
   useEffect(() => {
     applyTheme(theme);

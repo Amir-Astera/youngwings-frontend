@@ -417,8 +417,8 @@ export function ExhibitionsPage() {
                         <span
                           className={`ml-4 px-3 py-1 rounded-full text-xs whitespace-nowrap ${
                             status === "upcoming"
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-gray-100 text-gray-600"
+                              ? "bg-blue-600/20 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200"
+                              : "bg-gray-800/10 text-gray-800 dark:bg-gray-700/30 dark:text-gray-200"
                           }`}
                         >
                           {status === "upcoming" ? "Предстоящее" : "Завершенное"}
@@ -582,8 +582,8 @@ export function ExhibitionsPage() {
                         <span
                           className={`ml-4 px-3 py-1 rounded-full text-xs whitespace-nowrap ${
                             status === "upcoming"
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-gray-100 text-gray-600"
+                              ? "bg-blue-600/20 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200"
+                              : "bg-gray-800/10 text-gray-800 dark:bg-gray-700/30 dark:text-gray-200"
                           }`}
                         >
                           {status === "upcoming" ? "Предстоящее" : "Завершенное"}
