@@ -152,6 +152,54 @@ interface PaginatedResponse<T> {
   items: T[];
 }
 
+type ArrayParam = string[] | string | undefined;
+
+function normalizeArrayParam(value: ArrayParam): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const sanitized = value
+      .map((item) => item?.toString().trim())
+      .filter((item): item is string => Boolean(item));
+
+    if (!sanitized.length) {
+      return undefined;
+    }
+
+    return Array.from(new Set(sanitized)).join(",");
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parts = trimmed
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  if (!parts.length) {
+    return undefined;
+  }
+
+  return Array.from(new Set(parts)).join(",");
+}
+
+interface FetchTranslatorVacanciesOptions {
+  page?: number;
+  size?: number;
+  q?: string;
+  languages?: ArrayParam;
+  specialization?: ArrayParam;
+  experience?: string;
+  location?: string;
+  signal?: AbortSignal;
+}
+
 function sanitizeSearchKinds(kinds?: SearchKind[] | SearchKind): string | undefined {
   if (!kinds) {
     return undefined;
@@ -466,16 +514,42 @@ export async function fetchPopularTopics({
 export async function fetchTranslatorVacancies<T>({
   page = 1,
   size = 20,
+  q,
+  languages,
+  specialization,
+  experience,
+  location,
   signal,
-}: {
-  page?: number;
-  size?: number;
-  signal?: AbortSignal;
-} = {}): Promise<PaginatedResponse<T>> {
+}: FetchTranslatorVacanciesOptions = {}): Promise<PaginatedResponse<T>> {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
   });
+
+  const trimmedQuery = q?.trim();
+  if (trimmedQuery) {
+    params.set("q", trimmedQuery);
+  }
+
+  const normalizedLanguages = normalizeArrayParam(languages);
+  if (normalizedLanguages) {
+    params.set("languages", normalizedLanguages);
+  }
+
+  const normalizedSpecializations = normalizeArrayParam(specialization);
+  if (normalizedSpecializations) {
+    params.set("specialization", normalizedSpecializations);
+  }
+
+  const trimmedExperience = experience?.trim();
+  if (trimmedExperience) {
+    params.set("experience", trimmedExperience);
+  }
+
+  const trimmedLocation = location?.trim();
+  if (trimmedLocation) {
+    params.set("location", trimmedLocation);
+  }
 
   const response = await apiRequest(`${TRANSLATOR_VACANCIES_ENDPOINT}?${params.toString()}`, {
     method: "GET",
