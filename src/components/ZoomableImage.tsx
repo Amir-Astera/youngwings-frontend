@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog";
+import { ZoomIn } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { cn } from "./ui/utils";
 
@@ -17,46 +17,33 @@ export function ZoomableImage({
   alt,
   className,
   imageClassName,
-  fullImageClassName,
-  fullImageWrapperClassName,
+  fullImageClassName: _fullImageClassName,
+  fullImageWrapperClassName: _fullImageWrapperClassName,
   "data-testid": dataTestId,
 }: ZoomableImageProps) {
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          data-testid={dataTestId}
-          className={cn(
-            "group relative block w-full overflow-hidden cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            className,
-          )}
-          aria-label="Открыть изображение в полном размере"
-        >
-          <ImageWithFallback
-            src={src}
-            alt={alt}
-            className={cn(
-              "block h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105",
-              imageClassName,
-            )}
-          />
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[min(96vw,1100px)] border-none bg-transparent p-0 shadow-none">
-        <div
-          className={cn(
-            "flex max-h-[80vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-background p-2 shadow-xl sm:p-4",
-            fullImageWrapperClassName,
-          )}
-        >
-          <ImageWithFallback
-            src={src}
-            alt={alt}
-            className={cn("block h-full w-full max-h-[70vh] object-contain", fullImageClassName)}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div
+      data-testid={dataTestId}
+      className={cn(
+        "group relative block w-full overflow-hidden rounded-xl cursor-zoom-in",
+        className,
+      )}
+    >
+      <ImageWithFallback
+        src={src}
+        alt={alt}
+        className={cn(
+          "block h-full w-full object-cover transition-transform duration-500 ease-out",
+          "group-hover:scale-[1.12]",
+          imageClassName,
+        )}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-300 ease-out group-hover:bg-black/20"
+        aria-hidden="true"
+      >
+        <ZoomIn className="h-10 w-10 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100 drop-shadow-lg" aria-hidden="true" />
+      </div>
+    </div>
   );
 }
