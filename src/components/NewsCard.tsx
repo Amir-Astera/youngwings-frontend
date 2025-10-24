@@ -20,6 +20,7 @@ import {
   sendPostDislike,
   sendPostLike,
 } from "../lib/api";
+import { ZoomableImage } from "./ZoomableImage";
 import { formatRelativeTime } from "../lib/dates";
 import { hasViewBeenRecorded, markViewRecorded } from "../lib/clientState";
 import type { PostPersonalState, PostReactionType, PostResponse } from "../types/post";
