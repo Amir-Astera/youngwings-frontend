@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import { Languages, MapPin, Clock, QrCode, User, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
@@ -103,34 +110,11 @@ function getInitials(name?: string): string {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "П";
 }
 
-const services = [
-  {
-    id: 1,
-    title: "Письменный перевод",
-    description: "Перевод документов, статей, контрактов и другой письменной документации",
-    price: "От 1000 ₸ за страницу",
-  },
-  {
-    id: 2,
-    title: "Устный перевод",
-    description: "Синхронный и последовательный перевод на мероприятиях и встречах",
-    price: "От 10000 ₸ за час",
-  },
-  {
-    id: 3,
-    title: "Локализация",
-    description: "Адаптация контента под местную аудиторию, включая веб-сайты и приложения",
-    price: "От 2000 ₸ за час",
-  },
-  {
-    id: 4,
-    title: "Редактура и корректура",
-    description: "Проверка и улучшение качества переведенных текстов",
-    price: "От 800 ₸ за страницу",
-  },
-];
+interface TranslatorsPageProps {
+  onSidebarFiltersChange?: (content: ReactNode | null) => void;
+}
 
-export function TranslatorsPage() {
+export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps) {
   const [translators, setTranslators] = useState<TranslatorItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +122,8 @@ export function TranslatorsPage() {
   const [showUsername, setShowUsername] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [experienceQuery, setExperienceQuery] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [sourceLanguage, setSourceLanguage] = useState("");
+  const [targetLanguage, setTargetLanguage] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTranslators, setTotalTranslators] = useState(0);
@@ -153,11 +138,15 @@ export function TranslatorsPage() {
       const pageToRequest = pageOverride ?? currentPage;
 
       try {
+        const languagesFilter = [sourceLanguage, targetLanguage]
+          .map((language) => language.trim())
+          .filter((language, index, array) => language.length > 0 && array.indexOf(language) === index);
+
         const response = await fetchTranslatorVacancies<TranslatorResponse>({
           page: pageToRequest,
           size: sizeToRequest,
           q: searchQuery,
-          languages: selectedLanguage ? [selectedLanguage] : undefined,
+          languages: languagesFilter.length > 0 ? languagesFilter : undefined,
           specialization: selectedSpecialization ? [selectedSpecialization] : undefined,
           experience: experienceQuery,
           signal,
@@ -200,7 +189,15 @@ export function TranslatorsPage() {
         }
       }
     },
-    [currentPage, experienceQuery, pageSize, searchQuery, selectedLanguage, selectedSpecialization],
+    [
+      currentPage,
+      experienceQuery,
+      pageSize,
+      searchQuery,
+      sourceLanguage,
+      targetLanguage,
+      selectedSpecialization,
+    ],
   );
 
   const totalPages = useMemo(() => {
@@ -269,44 +266,167 @@ export function TranslatorsPage() {
     return uniqueExperiences.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
   }, [translators]);
 
-  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedLanguage(event.target.value);
+  const handleSourceLanguageChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setSourceLanguage(event.target.value);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleSpecializationChange = (event: ChangeEvent<HTMLSelectElement>) => {
+  const handleTargetLanguageChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setTargetLanguage(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleSpecializationChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
     setSelectedSpecialization(event.target.value);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleExperienceChange = (event: ChangeEvent<HTMLSelectElement>) => {
+  const handleExperienceChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
     setExperienceQuery(event.target.value);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleResetFilters = () => {
+  const handleResetFilters = useCallback(() => {
     setSearchQuery("");
     setExperienceQuery("");
-    setSelectedLanguage("");
+    setSourceLanguage("");
+    setTargetLanguage("");
     setSelectedSpecialization("");
     setCurrentPage(1);
-  };
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    setCurrentPage(1);
+    void loadTranslators(undefined, 1);
+  }, [loadTranslators]);
 
   const hasActiveFilters = useMemo(
     () =>
       Boolean(
         searchQuery.trim() ||
           experienceQuery.trim() ||
-          selectedLanguage.trim() ||
+          sourceLanguage.trim() ||
+          targetLanguage.trim() ||
           selectedSpecialization.trim(),
       ),
-    [experienceQuery, searchQuery, selectedLanguage, selectedSpecialization],
+    [experienceQuery, searchQuery, selectedSpecialization, sourceLanguage, targetLanguage],
   );
+
+  const sidebarFilters = useMemo(
+    () => (
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <h3 className="text-sm mb-4">Фильтры</h3>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Поиск</Label>
+          <Input value={searchQuery} onChange={handleSearchChange} placeholder="Имя или услуга..." />
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Язык (с)</Label>
+          <select
+            value={sourceLanguage}
+            onChange={handleSourceLanguageChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto"
+          >
+            <option value="">Любой</option>
+            {allLanguages.map((lang) => (
+              <option key={lang} value={lang}>
+                {lang}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Язык (на)</Label>
+          <select
+            value={targetLanguage}
+            onChange={handleTargetLanguageChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto"
+          >
+            <option value="">Любой</option>
+            {allLanguages.map((lang) => (
+              <option key={lang} value={lang}>
+                {lang}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Тип услуги</Label>
+          <select
+            value={selectedSpecialization}
+            onChange={handleSpecializationChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Все услуги</option>
+            {allSpecializations.map((specialization) => (
+              <option key={specialization} value={specialization}>
+                {specialization}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Опыт работы</Label>
+          <select
+            value={experienceQuery}
+            onChange={handleExperienceChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любой</option>
+            {allExperiences.map((experience) => (
+              <option key={experience} value={experience}>
+                {experience}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <Button className="flex-1" variant="default" onClick={handleApplyFilters}>
+            Применить
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+          >
+            Сбросить
+          </Button>
+        </div>
+      </div>
+    ),
+    [
+      allExperiences,
+      allLanguages,
+      allSpecializations,
+      experienceQuery,
+      handleApplyFilters,
+      handleExperienceChange,
+      handleResetFilters,
+      handleSearchChange,
+      handleSourceLanguageChange,
+      handleSpecializationChange,
+      handleTargetLanguageChange,
+      hasActiveFilters,
+      searchQuery,
+      selectedSpecialization,
+      sourceLanguage,
+      targetLanguage,
+    ],
+  );
+
+  useEffect(() => {
+    onSidebarFiltersChange?.(sidebarFilters);
+  }, [onSidebarFiltersChange, sidebarFilters]);
+
+  useEffect(() => () => {
+    onSidebarFiltersChange?.(null);
+  }, [onSidebarFiltersChange]);
 
   const visiblePages = useMemo(() => {
     if (totalPages <= 1) {
@@ -356,10 +476,26 @@ export function TranslatorsPage() {
                 </div>
 
                 <div>
-                  <Label className="text-sm mb-2 block">Язык</Label>
+                  <Label className="text-sm mb-2 block">Язык (с)</Label>
                   <select
-                    value={selectedLanguage}
-                    onChange={handleLanguageChange}
+                    value={sourceLanguage}
+                    onChange={handleSourceLanguageChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allLanguages.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-sm mb-2 block">Язык (на)</Label>
+                  <select
+                    value={targetLanguage}
+                    onChange={handleTargetLanguageChange}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                   >
                     <option value="">Любой</option>
@@ -403,9 +539,14 @@ export function TranslatorsPage() {
                   </select>
                 </div>
 
-                <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
-                  Сбросить фильтры
-                </Button>
+                <div className="space-y-2">
+                  <Button className="w-full" onClick={handleApplyFilters}>
+                    Применить
+                  </Button>
+                  <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
+                    Сбросить фильтры
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
@@ -415,10 +556,9 @@ export function TranslatorsPage() {
         </p>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
+      <div className="space-y-5">
         <div className="space-y-5">
-          <div className="space-y-5">
-            <h2>Наши переводчики</h2>
+          <h2>Наши переводчики</h2>
             {isLoading && translators.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-muted-foreground">
                 Загрузка переводчиков...
@@ -608,9 +748,9 @@ export function TranslatorsPage() {
                 </div>
               ))
             )}
-          </div>
+        </div>
 
-          {totalPages > 1 && (
+        {totalPages > 1 && (
             <Pagination className="pt-2">
               <PaginationContent>
                 <PaginationItem>
@@ -703,97 +843,17 @@ export function TranslatorsPage() {
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          )}
+        )}
 
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="mb-3">Нужна помощь с подбором переводчика?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Свяжитесь с нами, и мы поможем найти подходящего специалиста для вашего проекта
-            </p>
-            <Button className="gap-2">
-              Связаться с нами
-            </Button>
-          </div>
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6 shadow-sm">
+          <h3 className="mb-3">Нужна помощь с подбором переводчика?</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Свяжитесь с нами, и мы поможем найти подходящего специалиста для вашего проекта
+          </p>
+          <Button className="gap-2">
+            Связаться с нами
+          </Button>
         </div>
-
-        <aside className="hidden lg:block">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <h3 className="text-sm mb-4">Фильтры</h3>
-            <div className="mb-4">
-              <Label className="text-xs text-muted-foreground mb-2 block">Поиск</Label>
-              <Input
-                value={searchQuery}
-                onChange={handleSearchChange}
-                placeholder="Имя или услуга..."
-              />
-            </div>
-            <div className="mb-4">
-              <Label className="text-xs text-muted-foreground mb-2 block">Язык</Label>
-              <select
-                value={selectedLanguage}
-                onChange={handleLanguageChange}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 overflow-y-auto"
-              >
-                <option value="">Любой</option>
-                {allLanguages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-4">
-              <Label className="text-xs text-muted-foreground mb-2 block">Тип услуги</Label>
-              <select
-                value={selectedSpecialization}
-                onChange={handleSpecializationChange}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="">Все услуги</option>
-                {allSpecializations.map((specialization) => (
-                  <option key={specialization} value={specialization}>
-                    {specialization}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-4">
-              <Label className="text-xs text-muted-foreground mb-2 block">Опыт работы</Label>
-              <select
-                value={experienceQuery}
-                onChange={handleExperienceChange}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="">Любой</option>
-                {allExperiences.map((experience) => (
-                  <option key={experience} value={experience}>
-                    {experience}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                variant="default"
-                onClick={() => {
-                  setCurrentPage(1);
-                  void loadTranslators(undefined, 1);
-                }}
-              >
-                Применить
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleResetFilters}
-                disabled={!hasActiveFilters}
-              >
-                Сбросить
-              </Button>
-            </div>
-          </div>
-        </aside>
       </div>
 
       {/* QR Code Dialog */}
