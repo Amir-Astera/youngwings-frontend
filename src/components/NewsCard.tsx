@@ -32,6 +32,7 @@ interface NewsCardProps {
   content?: string | null;
   image?: string | null;
   category: string;
+  topic?: string;
   date: string;
   likes: number;
   dislikes: number;
@@ -95,6 +96,7 @@ export function NewsCard({
   content,
   image,
   category,
+  topic,
   date,
   likes,
   dislikes,
@@ -843,6 +845,13 @@ export function NewsCard({
     }
   };
 
+  const trimmedTopic = topic?.trim();
+  const trimmedCategory = category?.trim() ?? "";
+  const primaryLabel = trimmedTopic || trimmedCategory || undefined;
+  const secondaryLabel =
+    trimmedTopic && trimmedCategory && trimmedTopic !== trimmedCategory ? trimmedCategory : undefined;
+  const metaItems = [primaryLabel, secondaryLabel, date].filter(Boolean);
+
   return (
     <article
       ref={cardRef}
@@ -856,10 +865,13 @@ export function NewsCard({
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm text-gray-900 mb-0.5">YoungWings</div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{category}</span>
-              <span>·</span>
-              <span>{date}</span>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              {metaItems.map((item, index) => (
+                <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  <span>{item}</span>
+                </span>
+              ))}
             </div>
           </div>
         </div>
