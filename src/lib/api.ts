@@ -1,6 +1,7 @@
 import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
 import type { SearchKind, SearchResponse } from "../types/search";
 import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } from "../types/post";
+import { buildPostUrl } from "./urls";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
@@ -90,7 +91,36 @@ export function buildPostShareUrl(postId?: string | null): string | undefined {
     return undefined;
   }
 
-  return resolveApiUrl(`/api/post/share/${trimmedId}`);
+  return buildPostUrl(trimmedId);
+}
+
+export async function fetchPostShare(
+  postId: string,
+  { signal }: { signal?: AbortSignal } = {},
+): Promise<PostResponse | undefined> {
+  const trimmedId = postId?.trim();
+
+  if (!trimmedId) {
+    return undefined;
+  }
+
+  const response = await apiRequest(`/api/post/share/${trimmedId}`, { signal });
+  const payload = await parseJsonResponse<PostResponse | { message?: string }>(response);
+
+  if (!response.ok) {
+    const message =
+      (payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : undefined) ?? "Не удалось получить публикацию";
+
+    throw new Error(message);
+  }
+
+  if (!payload) {
+    throw new Error("Публикация не найдена");
+  }
+
+  return payload as PostResponse;
 }
 
 function getCookie(name: string): string | null {

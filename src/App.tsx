@@ -22,10 +22,14 @@ import {
   fetchPostsByTopic,
   fetchPostCounters,
   fetchPostMyState,
+  fetchPostShare,
   resolveFileUrl,
 } from "./lib/api";
 import { formatRelativeTime } from "./lib/dates";
 import { useVisiblePosts } from "./lib/useVisiblePosts";
+import { buildPostPath, extractPostIdFromLocation, getBasePath } from "./lib/urls";
+const APP_BASE_PATH = getBasePath();
+
 import type {
   PostCountersState,
   PostCountersUpdate,
@@ -249,13 +253,145 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [subsectionStates, setSubsectionStates] = useState<Record<string, SectionPostsState>>({});
   const [topicStates, setTopicStates] = useState<Record<string, SectionPostsState>>({});
+  const [isStandalonePostLoading, setIsStandalonePostLoading] = useState(false);
+  const [standalonePostError, setStandalonePostError] = useState<string | null>(null);
   const { register: registerPostVisibility, visibleIds: observedVisibleIds } = useVisiblePosts();
   const [debouncedVisibleIds, setDebouncedVisibleIds] = useState<string[]>([]);
   const countersRef = useRef<Record<string, PostCountersState>>({});
   const postsRef = useRef<PostSummary[]>([]);
   const currentPostRef = useRef<PostSummary | null>(null);
   const personalStateRef = useRef<Record<string, PostPersonalState>>({});
+  const standalonePostControllerRef = useRef<AbortController | null>(null);
+  const initialRouteHandledRef = useRef(false);
   const pendingCountersRef = useRef<Map<string, PostCountersPatch>>(new Map());
+  const updateHistoryToPost = useCallback((postId: string) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const path = buildPostPath(postId);
+    const currentPath = window.location.pathname;
+    const currentSearch = window.location.search;
+
+    if (currentPath === path && !currentSearch) {
+      window.history.replaceState({ postId }, "", path);
+      return;
+    }
+
+    window.history.pushState({ postId }, "", path);
+  }, []);
+
+  const navigateToBase = useCallback(({ replace }: { replace?: boolean } = {}) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const targetPath = APP_BASE_PATH;
+
+    if (replace) {
+      window.history.replaceState({}, "", targetPath);
+    } else {
+      window.history.pushState({}, "", targetPath);
+    }
+  }, []);
+
+  const openPost = useCallback(
+    (postData: PostSummary, options: { skipHistory?: boolean } = {}) => {
+      if (!postData?.id) {
+        return;
+      }
+
+      const counters = countersRef.current[postData.id];
+      const personal = personalStateRef.current[postData.id];
+      const enrichedPost: PostSummary = {
+        ...postData,
+        likes: counters?.likes ?? postData.likes ?? 0,
+        dislikes: counters?.dislikes ?? postData.dislikes ?? 0,
+        comments: counters?.comments ?? postData.comments ?? 0,
+        views: counters?.views ?? postData.views ?? 0,
+        myReaction: personal?.reaction ?? postData.myReaction ?? null,
+        hasViewed: personal?.viewed ?? postData.hasViewed ?? false,
+      };
+
+      setCurrentPostData(enrichedPost);
+      setViewingPost(true);
+      setStandalonePostError(null);
+      setIsStandalonePostLoading(false);
+
+      if (typeof window !== "undefined") {
+        if (options.skipHistory) {
+          window.history.replaceState(
+            { postId: postData.id },
+            "",
+            `${window.location.pathname}${window.location.search}${window.location.hash}`
+          );
+        } else {
+          updateHistoryToPost(postData.id);
+        }
+      }
+    },
+    [updateHistoryToPost],
+  );
+
+  const loadPostById = useCallback(
+    async (postId: string, options: { skipHistory?: boolean } = {}) => {
+      const trimmedId = postId?.trim();
+
+      if (!trimmedId) {
+        return;
+      }
+
+      const existing =
+        postsRef.current.find((item) => item.id === trimmedId) ??
+        (currentPostRef.current && currentPostRef.current.id === trimmedId ? currentPostRef.current : null);
+
+      if (existing) {
+        openPost(existing, options);
+        return;
+      }
+
+      standalonePostControllerRef.current?.abort();
+      const controller = new AbortController();
+      standalonePostControllerRef.current = controller;
+
+      setStandalonePostError(null);
+      setIsStandalonePostLoading(true);
+      setViewingPost(true);
+      setCurrentPostData((previous) => (previous?.id === trimmedId ? previous : null));
+
+      try {
+        const response = await fetchPostShare(trimmedId, { signal: controller.signal });
+
+        if (!response) {
+          throw new Error("Публикация не найдена");
+        }
+
+        const summary = mapPostResponseToSummary(response);
+        openPost(summary, options);
+      } catch (caughtError) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const message =
+          caughtError instanceof Error && caughtError.message
+            ? caughtError.message
+            : "Не удалось загрузить публикацию";
+
+        setStandalonePostError(message);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsStandalonePostLoading(false);
+        }
+
+        if (standalonePostControllerRef.current === controller) {
+          standalonePostControllerRef.current = null;
+        }
+      }
+    },
+    [openPost],
+  );
+
   const flushFrameRef = useRef<number | null>(null);
 
   const mergePostsIntoState = useCallback(
@@ -614,6 +750,35 @@ export default function App() {
   useEffect(() => {
     personalStateRef.current = personalStateById;
   }, [personalStateById]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const synchronizeWithLocation = () => {
+      const postId = extractPostIdFromLocation(window.location);
+
+      if (postId) {
+        void loadPostById(postId, { skipHistory: true });
+        return;
+      }
+
+      standalonePostControllerRef.current?.abort();
+      setIsStandalonePostLoading(false);
+      setStandalonePostError(null);
+      setViewingPost(false);
+      setCurrentPostData(null);
+    };
+
+    synchronizeWithLocation();
+    window.addEventListener("popstate", synchronizeWithLocation);
+
+    return () => {
+      window.removeEventListener("popstate", synchronizeWithLocation);
+      standalonePostControllerRef.current?.abort();
+    };
+  }, [loadPostById]);
 
   useEffect(() => {
     return () => {
@@ -1065,6 +1230,20 @@ export default function App() {
 
   // Reset viewingPost when page changes
   useEffect(() => {
+    const hasPostInLocation =
+      typeof window !== "undefined" && Boolean(extractPostIdFromLocation(window.location));
+
+    if (!initialRouteHandledRef.current) {
+      initialRouteHandledRef.current = true;
+
+      if (hasPostInLocation) {
+        return;
+      }
+    }
+
+    standalonePostControllerRef.current?.abort();
+    setIsStandalonePostLoading(false);
+    setStandalonePostError(null);
     setViewingPost(false);
     setCurrentPostData(null);
   }, [currentPage]);
@@ -1075,35 +1254,26 @@ export default function App() {
         return;
       }
 
-      const counters = countersById[postData.id];
-
-      const enrichedPost: PostSummary = counters
-        ? {
-            ...postData,
-            likes: counters.likes,
-            dislikes: counters.dislikes,
-            comments: counters.comments,
-            views: counters.views,
-          }
-        : { ...postData };
-
-      const personal = personalStateById[postData.id];
-
-      if (personal) {
-        enrichedPost.myReaction = personal.reaction ?? enrichedPost.myReaction ?? null;
-        enrichedPost.hasViewed = personal.viewed ?? enrichedPost.hasViewed ?? false;
-      }
-
-      setCurrentPostData(enrichedPost);
-      setViewingPost(true);
+      openPost(postData);
     },
-    [countersById, personalStateById],
+    [openPost],
   );
 
-  const handleBackFromPost = () => {
+  const handleBackFromPost = useCallback(() => {
+    standalonePostControllerRef.current?.abort();
+    setIsStandalonePostLoading(false);
+    setStandalonePostError(null);
     setViewingPost(false);
     setCurrentPostData(null);
-  };
+
+    if (typeof window !== "undefined") {
+      if (window.history.state?.postId && window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigateToBase({ replace: true });
+      }
+    }
+  }, [navigateToBase]);
 
   const handleRetry = () => {
     if (!isLoading) {
@@ -1274,6 +1444,44 @@ export default function App() {
     },
     [applyPersonalStateUpdates],
   );
+
+  const renderPostView = () => {
+    if (!viewingPost) {
+      return null;
+    }
+
+    if (isStandalonePostLoading) {
+      return (
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <p className="text-muted-foreground">Загрузка публикации...</p>
+        </div>
+      );
+    }
+
+    if (standalonePostError) {
+      return (
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center space-y-4">
+          <p className="text-muted-foreground">{standalonePostError}</p>
+          <Button variant="outline" size="sm" onClick={handleBackFromPost}>
+            Вернуться назад
+          </Button>
+        </div>
+      );
+    }
+
+    if (!currentPostData) {
+      return null;
+    }
+
+    return (
+      <PostPage
+        onBack={handleBackFromPost}
+        postData={currentPostData}
+        onPostUpdate={handlePostMetricsUpdate}
+        onPersonalStateUpdate={handlePostPersonalStateUpdate}
+      />
+    );
+  };
 
   const flushPendingUpdates = useCallback(() => {
     if (pendingCountersRef.current.size === 0) {
@@ -1548,15 +1756,9 @@ export default function App() {
 
             {/* Main Content */}
             <div className="min-h-[calc(100vh-10rem)]">
-              {viewingPost && currentPage === "home" && (
-                <PostPage
-                  onBack={handleBackFromPost}
-                  postData={currentPostData}
-                  onPostUpdate={handlePostMetricsUpdate}
-                  onPersonalStateUpdate={handlePostPersonalStateUpdate}
-                />
-              )}
-              
+              {currentPage === "home" && renderPostView()}
+
+             
               {!viewingPost && currentPage === "home" && (
                 <div className="space-y-3 sm:space-y-5 lg:pt-6 pt-1">
                   {isLoading && posts.length === 0 && (
@@ -1679,14 +1881,7 @@ export default function App() {
                 );
               })()}
               
-              {currentPage.startsWith("subsection-") && viewingPost && (
-                <PostPage
-                  onBack={handleBackFromPost}
-                  postData={currentPostData}
-                  onPostUpdate={handlePostMetricsUpdate}
-                  onPersonalStateUpdate={handlePostPersonalStateUpdate}
-                />
-              )}
+              {currentPage.startsWith("subsection-") && renderPostView()}
 
               {currentPage === "events" && <EventsPage />}
 
@@ -1734,14 +1929,7 @@ export default function App() {
                   />
                 );
               })()}
-              {currentPage.startsWith("topic-") && viewingPost && (
-                <PostPage
-                  onBack={handleBackFromPost}
-                  postData={currentPostData}
-                  onPostUpdate={handlePostMetricsUpdate}
-                  onPersonalStateUpdate={handlePostPersonalStateUpdate}
-                />
-              )}
+              {currentPage.startsWith("topic-") && renderPostView()}
             </div>
 
             {/* Right Sidebar - Scrolls with page */}
