@@ -8,7 +8,11 @@ import type { EventResponse } from "../types/event";
 
 const PAGE_SIZE = 20;
 
-export function EventsPage() {
+interface EventsPageProps {
+  highlightEventId?: string | null;
+}
+
+export function EventsPage({ highlightEventId }: EventsPageProps) {
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +60,23 @@ export function EventsPage() {
   const hasEvents = events.length > 0;
 
   const renderedEvents = useMemo(() => {
-    return events.map((event) => {
+    const trimmedHighlight = highlightEventId?.trim();
+    let orderedEvents = events;
+
+    if (trimmedHighlight) {
+      const index = events.findIndex((event) => event.id === trimmedHighlight);
+
+      if (index > 0) {
+        const highlighted = events[index];
+        orderedEvents = [
+          highlighted,
+          ...events.slice(0, index),
+          ...events.slice(index + 1),
+        ];
+      }
+    }
+
+    return orderedEvents.map((event) => {
       const coverUrl = getEventCoverUrl(event);
       const eventDate = formatEventDate(event.eventDate);
       const formatLabel = getEventFormatLabel(event.format);
@@ -140,7 +160,7 @@ export function EventsPage() {
         </article>
       );
     });
-  }, [events]);
+  }, [events, highlightEventId]);
 
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">

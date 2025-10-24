@@ -253,6 +253,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [subsectionStates, setSubsectionStates] = useState<Record<string, SectionPostsState>>({});
   const [topicStates, setTopicStates] = useState<Record<string, SectionPostsState>>({});
+  const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [isStandalonePostLoading, setIsStandalonePostLoading] = useState(false);
   const [standalonePostError, setStandalonePostError] = useState<string | null>(null);
   const { register: registerPostVisibility, visibleIds: observedVisibleIds } = useVisiblePosts();
@@ -781,6 +782,34 @@ export default function App() {
   }, [loadPostById]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncPageFromSearch = () => {
+      const params = new URLSearchParams(window.location.search || "");
+      const section = params.get("section")?.trim().toLowerCase();
+      const eventParam = params.get("event") ?? params.get("eventId");
+
+      if (section === "events") {
+        const trimmedEventId = eventParam?.trim() || null;
+
+        setHighlightedEventId(trimmedEventId);
+        setCurrentPage((previous) => (previous === "events" ? previous : "events"));
+      } else {
+        setHighlightedEventId(null);
+      }
+    };
+
+    syncPageFromSearch();
+    window.addEventListener("popstate", syncPageFromSearch);
+
+    return () => {
+      window.removeEventListener("popstate", syncPageFromSearch);
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       pendingCountersRef.current.clear();
 
@@ -791,6 +820,12 @@ export default function App() {
       flushFrameRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (currentPage !== "events") {
+      setHighlightedEventId(null);
+    }
+  }, [currentPage]);
 
   useEffect(() => {
     if (!currentPage.startsWith("subsection-")) {
@@ -1883,7 +1918,7 @@ export default function App() {
               
               {currentPage.startsWith("subsection-") && renderPostView()}
 
-              {currentPage === "events" && <EventsPage />}
+              {currentPage === "events" && <EventsPage highlightEventId={highlightedEventId} />}
 
               {currentPage === "upcoming-events" && <UpcomingEventsPage onPageChange={setCurrentPage} />}
 

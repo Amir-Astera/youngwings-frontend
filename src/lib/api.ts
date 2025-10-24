@@ -1,7 +1,7 @@
 import type { CommentListResponse, CommentResponse, CreateCommentRequest } from "../types/comment";
 import type { SearchKind, SearchResponse } from "../types/search";
 import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } from "../types/post";
-import { buildPostUrl } from "./urls";
+import { buildEventsUrl, buildPostUrl } from "./urls";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
@@ -92,6 +92,12 @@ export function buildPostShareUrl(postId?: string | null): string | undefined {
   }
 
   return buildPostUrl(trimmedId);
+}
+
+export function buildEventShareUrl(eventId?: string | null): string {
+  const trimmedId = eventId?.trim();
+
+  return buildEventsUrl(trimmedId);
 }
 
 export async function fetchPostShare(
