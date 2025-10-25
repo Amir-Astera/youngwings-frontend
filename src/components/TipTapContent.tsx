@@ -119,14 +119,14 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
     }
     case "bulletList":
       return (
-        <ul key={key} className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+        <ul key={key} className="list-disc list-outside pl-6 space-y-2 text-sm text-muted-foreground">
           {renderNodes(node.content, `${key}-bullet`)}
         </ul>
       );
     case "orderedList": {
       const start = typeof node.attrs?.start === "number" ? node.attrs.start : undefined;
       return (
-        <ol key={key} start={start} className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+        <ol key={key} start={start} className="list-decimal list-outside pl-6 space-y-2 text-sm text-muted-foreground">
           {renderNodes(node.content, `${key}-ordered`)}
         </ol>
       );
