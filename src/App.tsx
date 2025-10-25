@@ -1783,7 +1783,7 @@ export default function App() {
       
       <div className="mt-[104px] lg:mt-14">
         <main className="mx-auto lg:py-8 py-2">
-          <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_320px] gap-5 lg:gap-12 max-w-[1400px] mx-auto px-4 sm:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_380px] gap-5 lg:gap-8 max-w-[1400px] mx-auto px-4 sm:px-8">
             {/* Left Sidebar - Navigation */}
             <div className="hidden lg:block pt-6">
               <LeftSidebar currentPage={currentPage} onPageChange={setCurrentPage} />
