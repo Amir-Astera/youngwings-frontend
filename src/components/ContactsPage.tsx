@@ -100,7 +100,7 @@ export function ContactsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-8">
               <a
                 href="https://www.tiktok.com/@youngwinds"
-                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-blue-600 from-purple-600 via-fuchsia-500 to-pink-500"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -115,7 +115,7 @@ export function ContactsPage() {
 
               <a
                 href="https://www.instagram.com/youngwinds"
-                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-pink-500 via-rose-500 to-orange-400"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-blue-600 from-pink-500 via-rose-500 to-orange-400"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -130,7 +130,7 @@ export function ContactsPage() {
 
               <a
                 href="https://www.threads.net/@youngwinds"
-                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-blue-600 from-gray-900 via-gray-800 to-gray-700"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -145,7 +145,7 @@ export function ContactsPage() {
 
               <a
                 href="https://t.me/orientventus_kz"
-                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-blue-600 from-sky-500 via-blue-500 to-indigo-500"
                 target="_blank"
                 rel="noreferrer"
               >
