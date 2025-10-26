@@ -45,8 +45,8 @@ export function LeftSidebar({ currentPage, onPageChange }: LeftSidebarProps) {
                 onClick={() => onPageChange(`subsection-${section}`)}
                 className={`block w-full text-left px-2 py-1.5 text-sm transition-colors font-normal whitespace-nowrap overflow-hidden text-ellipsis rounded-lg ${
                   currentPage === `subsection-${section}`
-                    ? "text-black bg-blue-50"
-                    : "text-gray-900 hover:text-blue-600 hover:bg-gray-50"
+                    ? "text-[#717182] bg-blue-50"
+                    : "text-[#717182] hover:bg-gray-50"
                 }`}
               >
                 {section}
