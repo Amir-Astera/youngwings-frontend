@@ -196,10 +196,10 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {filterContent && filterContent}
 
       {/* Popular Topics */}
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm text-muted-foreground">
+      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5 text-blue-600" />
-          <h3 className="text-sm text-muted-foreground ">Популярные темы</h3>
+          <h3 className="text-sm">Популярные темы</h3>
         </div>
         <div ref={popularTopicsRef} className="space-y-3 max-h-[300px] overflow-y-auto scrollbar-hide">
           {isTopicsLoading && popularTopics.length === 0 && (
@@ -217,7 +217,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
               className="w-full flex items-center justify-between p-2 rounded-lg transition-colors text-left hover:bg-accent/60"
             >
               <span className="text-sm text-muted-foreground ">{topic.name}</span>
-              <span className="text-xs text-blue-200 bg-blue-600/20 px-2 py-0.5 rounded-full dark:bg-blue-500/30 dark:text-blue-100">
+              <span className="text-xs text-muted-foreground bg-blue-600/20 px-2 py-0.5 rounded-full dark:bg-blue-500/30 dark:text-blue-10 0">
                 {topic.count}
               </span>
             </button>
@@ -231,10 +231,10 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
 
       {/* Events - Hide on exhibitions and events pages */}
       {currentPage !== "exhibitions" && currentPage !== "events" && currentPage !== "upcoming-events" && (
-        <div className="bg-white border border-border rounded-xl p-5 shadow-sm text-muted-foreground ">
+        <div className="bg-white border border-border rounded-xl p-5 shadow-sm ">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm text-muted-foreground ">Ближайшие события</h3>
+            <h3 className="text-sm ">Ближайшие события</h3>
           </div>
           <div ref={eventsRef} className="space-y-4 max-h-[300px] overflow-y-auto scrollbar-hide">
             {isEventsLoading && events.length === 0 && (
@@ -254,7 +254,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
                   onClick={() => onPageChange("upcoming-events")}
                   className="w-full text-left pb-4 border-border last:border-0 last:pb-0 rounded-lg p-2 -m-2 transition-colors hover:bg-accent/60"
                 >
-                  <h4 className="text-sm mb-1 text-muted-foreground ">{event.title}</h4>
+                  <h4 className="text-sm mb-1 ">{event.title}</h4>
                   {eventDate && (
                     <p className="text-xs text-muted-foreground  mb-0.5 flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-blue-600" />
@@ -289,11 +289,11 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {/* Support Us */}
       <div
         ref={supportBlockRef}
-        className="bg-white border border-border rounded-xl p-5 shadow-sm transition-all duration-300 text-muted-foreground "
+        className="bg-white border border-border rounded-xl p-5 shadow-sm transition-all duration-300"
       >
         <div className="flex items-center gap-2 mb-3">
           <Heart className="w-5 h-5 text-blue-600" />
-          <h3 className="text-sm text-muted-foreground">Поддержите нас</h3>
+          <h3 className="text-sm">Поддержите нас</h3>
         </div>
         <p className="text-xs text-muted-foreground  mb-4 leading-relaxed">
           OrientVentus — независимое издание. Ваша поддержка помогает нам создавать качественный контент.
