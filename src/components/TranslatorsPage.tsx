@@ -6,12 +6,12 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { Languages, MapPin, Clock, QrCode, User, SlidersHorizontal } from "lucide-react";
+import { Languages, MapPin, Clock, Image as ImageIcon, User, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Label } from "./ui/label";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { fetchTranslatorVacancies, resolveFileUrl } from "../lib/api";
 import type { TranslatorResponse } from "../types/translator";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
@@ -35,7 +35,7 @@ interface TranslatorItem {
   experience?: string;
   experienceYears?: number | null;
   username?: string;
-  qrCode?: string;
+  photoUrl?: string;
 }
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -74,7 +74,7 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
   const specialization = response.specialization?.trim();
   const location = response.location?.trim();
   const username = response.nickname?.trim();
-  const qrCode =
+  const photoUrl =
     resolveFileUrl(response.qrUrl ?? undefined, {
       defaultPrefix: "/api/files/thumbnail/ASSETS",
     }) ?? undefined;
@@ -88,7 +88,7 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
     experience: experience || undefined,
     experienceYears: parseExperienceYears(experience),
     username: username || undefined,
-    qrCode,
+    photoUrl,
   };
 }
 
@@ -118,7 +118,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
   const [translators, setTranslators] = useState<TranslatorItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedQR, setSelectedQR] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [showUsername, setShowUsername] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [experienceQuery, setExperienceQuery] = useState("");
@@ -173,7 +173,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
           setPageSize(resolvedSize);
         }
         setShowUsername(null);
-        setSelectedQR(null);
+        setSelectedPhoto(null);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -546,6 +546,13 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                       {/* Top: Photo and Name */}
                       <div className="flex items-center gap-4">
                         <Avatar className="w-20 h-20">
+                          {translator.photoUrl ? (
+                            <AvatarImage
+                              src={translator.photoUrl}
+                              alt={`Фото переводчика ${translator.name}`}
+                              className="object-cover"
+                            />
+                          ) : null}
                           <AvatarFallback className="bg-blue-50 text-blue-700 font-semibold text-lg">
                             {getInitials(translator.name)}
                           </AvatarFallback>
@@ -595,11 +602,11 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                         <Button
                           size="sm"
                           className="gap-2 flex-1"
-                          onClick={() => translator.qrCode && setSelectedQR(translator.qrCode)}
-                          disabled={!translator.qrCode}
+                          onClick={() => translator.photoUrl && setSelectedPhoto(translator.photoUrl)}
+                          disabled={!translator.photoUrl}
                         >
-                          <QrCode className="w-4 h-4" />
-                          QR
+                          <ImageIcon className="w-4 h-4" />
+                          Фото
                         </Button>
                         <Button
                           size="sm"
@@ -627,6 +634,13 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                     <div className="hidden md:flex gap-6">
                       {/* Photo - Left Side */}
                       <Avatar className="w-32 h-32 rounded-xl">
+                        {translator.photoUrl ? (
+                          <AvatarImage
+                            src={translator.photoUrl}
+                            alt={`Фото переводчика ${translator.name}`}
+                            className="object-cover"
+                          />
+                        ) : null}
                         <AvatarFallback className="rounded-xl bg-blue-50 text-blue-700 font-semibold text-xl">
                           {getInitials(translator.name)}
                         </AvatarFallback>
@@ -675,11 +689,11 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                           <Button
                             size="sm"
                             className="gap-2"
-                            onClick={() => translator.qrCode && setSelectedQR(translator.qrCode)}
-                            disabled={!translator.qrCode}
+                            onClick={() => translator.photoUrl && setSelectedPhoto(translator.photoUrl)}
+                            disabled={!translator.photoUrl}
                           >
-                            <QrCode className="w-4 h-4" />
-                            QR
+                            <ImageIcon className="w-4 h-4" />
+                            Фото
                           </Button>
                           <Button
                             size="sm"
@@ -814,20 +828,18 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
         </div>
       </div>
 
-      {/* QR Code Dialog */}
-      <Dialog open={!!selectedQR} onOpenChange={() => setSelectedQR(null)}>
+      {/* Photo Dialog */}
+      <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>QR-код переводчика</DialogTitle>
-            <DialogDescription>
-              Отсканируйте QR-код для связи с переводчиком
-            </DialogDescription>
+            <DialogTitle>Фото переводчика</DialogTitle>
+            <DialogDescription>Просмотр фотографии переводчика</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center p-6">
-            {selectedQR ? (
-              <ImageWithFallback src={selectedQR} alt="QR Code" className="w-64 h-64 object-contain" />
+            {selectedPhoto ? (
+              <ImageWithFallback src={selectedPhoto} alt="Фото переводчика" className="w-64 h-64 object-contain" />
             ) : (
-              <p className="text-sm text-muted-foreground">QR-код недоступен</p>
+              <p className="text-sm text-muted-foreground">Фотография недоступна</p>
             )}
           </div>
         </DialogContent>
