@@ -29,7 +29,7 @@ export function FeaturedPost({
   comments,
 }: FeaturedPostProps) {
   return (
-    <article className="bg-[#212121] text-card-foreground border border-border rounded-lg overflow-hidden hover:shadow-xl transition-shadow">
+    <article className="bg-white text-card-foreground border border-border rounded-lg overflow-hidden hover:shadow-xl transition-shadow">
       <div className="grid md:grid-cols-2 gap-0">
         {/* Image */}
         <div className="relative aspect-[4/3] md:aspect-auto overflow-hidden">

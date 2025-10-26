@@ -196,7 +196,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {filterContent && filterContent}
 
       {/* Popular Topics */}
-      <div className="bg-[#212121] text-card-foreground border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-white text-card-foreground border border-border rounded-xl p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm">Популярные темы</h3>
@@ -231,7 +231,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
 
       {/* Events - Hide on exhibitions and events pages */}
       {currentPage !== "exhibitions" && currentPage !== "events" && currentPage !== "upcoming-events" && (
-        <div className="bg-[#212121] text-card-foreground border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-white text-card-foreground border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm">Ближайшие события</h3>
@@ -289,7 +289,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {/* Support Us */}
       <div
         ref={supportBlockRef}
-        className="bg-[#212121] text-card-foreground border border-border rounded-xl p-5 shadow-sm transition-all duration-300"
+        className="bg-white text-card-foreground border border-border rounded-xl p-5 shadow-sm transition-all duration-300"
       >
         <div className="flex items-center gap-2 mb-3">
           <Heart className="w-5 h-5 text-blue-600" />

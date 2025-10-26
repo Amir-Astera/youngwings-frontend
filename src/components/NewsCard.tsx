@@ -849,7 +849,7 @@ export function NewsCard({
   return (
     <article
       ref={cardRef}
-      className="bg-[#212121] text-card-foreground border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
+      className="bg-white text-card-foreground border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
     >
       {/* Header */}
       <div className="p-5 pb-4">
