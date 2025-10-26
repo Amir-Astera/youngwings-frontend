@@ -1782,15 +1782,8 @@ export default function App() {
       <MobileMenu currentPage={currentPage} onPageChange={setCurrentPage} />
       
       <div className="mt-[104px] lg:mt-14">
-        <main className="mx-auto lg:py-8 py-2">
-          <div 
-  className="grid grid-cols-1 gap-5 mx-auto px-4 sm:px-6"
-  style={{
-    maxWidth: '1440px',
-    gridTemplateColumns: window.innerWidth >= 1024 ? '240px 1fr 340px' : '1fr',
-    gap: window.innerWidth >= 1024 ? '2.5rem' : '1.25rem'
-  }}
->
+        <main className="mx-auto w-full max-w-[1440px] px-4 py-2 sm:px-6 lg:py-8">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_minmax(0,1fr)_340px] lg:gap-10">
             {/* Left Sidebar - Navigation */}
             <div className="hidden lg:block pt-6">
               <LeftSidebar currentPage={currentPage} onPageChange={setCurrentPage} />
