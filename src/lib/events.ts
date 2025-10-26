@@ -50,6 +50,43 @@ export function getEventFormatLabel(value?: string | null): string | undefined {
   }
 }
 
+const EVENT_STATUS_LABELS: Record<string, string> = {
+  PLANNED: "Запланировано",
+  SCHEDULED: "Запланировано",
+  UPCOMING: "Скоро",
+  ACTIVE: "Активно",
+  ONGOING: "В процессе",
+  IN_PROGRESS: "В процессе",
+  COMPLETED: "Завершено",
+  FINISHED: "Завершено",
+  CANCELLED: "Отменено",
+  CANCELED: "Отменено",
+  POSTPONED: "Перенесено",
+  DRAFT: "Черновик",
+  PUBLISHED: "Опубликовано",
+};
+
+export function getEventStatusLabel(value?: string | null): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  const lookupKey = normalized.toUpperCase();
+  const label = EVENT_STATUS_LABELS[lookupKey];
+
+  if (label) {
+    return label;
+  }
+
+  return normalized;
+}
+
 export function getEventCoverUrl(event: Pick<EventResponse, "coverUrl">): string | undefined {
   return (
     resolveFileUrl(event.coverUrl ?? undefined, {

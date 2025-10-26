@@ -2,6 +2,7 @@ export interface EventResponse {
   id: string;
   title: string;
   description?: string;
+  status?: string;
   eventDate?: string;
   eventTime?: string;
   location?: string;

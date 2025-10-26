@@ -1,35 +1,134 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, MapPin, Globe2, MapPinned } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { BadgeCheck, Calendar, Globe2, MapPin, MapPinned, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { fetchEvents } from "../lib/api";
-import { formatEventDate, getEventCoverUrl, getEventFormatLabel } from "../lib/events";
+import { formatEventDate, getEventCoverUrl, getEventFormatLabel, getEventStatusLabel } from "../lib/events";
 import type { EventResponse } from "../types/event";
 
 const PAGE_SIZE = 20;
 
-interface EventsPageProps {
-  highlightEventId?: string | null;
+const DEFAULT_STATUS_CODES = ["PLANNED", "ONGOING", "ACTIVE", "COMPLETED", "CANCELLED", "PUBLISHED"] as const;
+const DEFAULT_FORMAT_CODES = ["ONLINE", "OFFLINE", "HYBRID"] as const;
+
+function mergeStringLists(existing: string[], values: (string | null | undefined)[]): string[] {
+  const additions = values
+    .map((value) => value?.toString().trim())
+    .filter((value): value is string => Boolean(value));
+
+  if (additions.length === 0) {
+    return existing;
+  }
+
+  const seen = new Set(existing.map((value) => value.toLowerCase()));
+  let changed = false;
+  const nextValues = [...existing];
+
+  for (const value of additions) {
+    const lower = value.toLowerCase();
+
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      nextValues.push(value);
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return existing;
+  }
+
+  return nextValues.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
 }
 
-export function EventsPage({ highlightEventId }: EventsPageProps) {
+function validateDateRange(start?: string, end?: string): string | null {
+  if (!start || !end) {
+    return null;
+  }
+
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return "Введите корректные даты";
+  }
+
+  if (startDate > endDate) {
+    return "Дата окончания не может быть раньше даты начала";
+  }
+
+  return null;
+}
+
+interface EventsPageProps {
+  highlightEventId?: string | null;
+  onSidebarFiltersChange?: (content: ReactNode | null) => void;
+}
+
+export function EventsPage({ highlightEventId, onSidebarFiltersChange }: EventsPageProps) {
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [formatFilter, setFormatFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [dateRangeError, setDateRangeError] = useState<string | null>(null);
+  const [knownStatuses, setKnownStatuses] = useState<string[]>([]);
+  const [knownFormats, setKnownFormats] = useState<string[]>([]);
+  const [knownRegions, setKnownRegions] = useState<string[]>([]);
+  const [knownCities, setKnownCities] = useState<string[]>([]);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   const loadEvents = useCallback(
     async (signal?: AbortSignal) => {
+      const validationError = validateDateRange(dateFrom, dateTo);
+
+      setDateRangeError(validationError);
+
+      if (validationError) {
+        setEvents([]);
+        setError(validationError);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await fetchEvents<EventResponse>({ page: 1, size: PAGE_SIZE, signal });
+        const response = await fetchEvents<EventResponse>({
+          page: 1,
+          size: PAGE_SIZE,
+          status: statusFilter || undefined,
+          format: formatFilter || undefined,
+          region: regionFilter || undefined,
+          location: cityFilter || undefined,
+          title: searchQuery || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          signal,
+        });
 
         if (signal?.aborted) {
           return;
         }
 
-        setEvents(Array.isArray(response.items) ? response.items : []);
+        const items = Array.isArray(response.items) ? response.items : [];
+
+        setEvents(items);
+        setKnownStatuses((prev) => mergeStringLists(prev, items.map((item) => item.status)));
+        setKnownFormats((prev) => mergeStringLists(prev, items.map((item) => item.format)));
+        setKnownRegions((prev) => mergeStringLists(prev, items.map((item) => item.region)));
+        setKnownCities((prev) => mergeStringLists(prev, items.map((item) => item.location)));
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -44,7 +143,7 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
         }
       }
     },
-    [],
+    [cityFilter, dateFrom, dateTo, formatFilter, regionFilter, searchQuery, statusFilter],
   );
 
   useEffect(() => {
@@ -57,7 +156,304 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
     };
   }, [loadEvents]);
 
+  useEffect(() => {
+    setDateRangeError(validateDateRange(dateFrom, dateTo));
+  }, [dateFrom, dateTo]);
+
   const hasEvents = events.length > 0;
+
+  const statusOptions = useMemo(() => {
+    const dynamic = knownStatuses
+      .filter((value) => value.trim().length > 0)
+      .filter(
+        (value) =>
+          !DEFAULT_STATUS_CODES.some((defaultStatus) => defaultStatus.toLowerCase() === value.toLowerCase()),
+      )
+      .sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+
+    const combined = [...DEFAULT_STATUS_CODES, ...dynamic];
+    const seen = new Set<string>();
+
+    return combined
+      .filter((value) => {
+        const key = value.toLowerCase();
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      })
+      .map((value) => ({
+        value,
+        label: getEventStatusLabel(value) ?? value,
+      }));
+  }, [knownStatuses]);
+
+  const formatOptions = useMemo(() => {
+    const dynamic = knownFormats
+      .filter((value) => value.trim().length > 0)
+      .filter(
+        (value) =>
+          !DEFAULT_FORMAT_CODES.some((defaultFormat) => defaultFormat.toLowerCase() === value.toLowerCase()),
+      )
+      .sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+
+    const combined = [...DEFAULT_FORMAT_CODES, ...dynamic];
+    const seen = new Set<string>();
+
+    return combined
+      .filter((value) => {
+        const key = value.toLowerCase();
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      })
+      .map((value) => ({
+        value,
+        label: getEventFormatLabel(value) ?? value,
+      }));
+  }, [knownFormats]);
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        searchQuery.trim() ||
+          statusFilter ||
+          formatFilter ||
+          regionFilter ||
+          cityFilter ||
+          dateFrom ||
+          dateTo,
+      ),
+    [cityFilter, dateFrom, dateTo, formatFilter, regionFilter, searchQuery, statusFilter],
+  );
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+
+    if (searchQuery.trim()) {
+      count += 1;
+    }
+
+    if (statusFilter) {
+      count += 1;
+    }
+
+    if (formatFilter) {
+      count += 1;
+    }
+
+    if (regionFilter) {
+      count += 1;
+    }
+
+    if (cityFilter) {
+      count += 1;
+    }
+
+    if (dateFrom) {
+      count += 1;
+    }
+
+    if (dateTo) {
+      count += 1;
+    }
+
+    return count;
+  }, [cityFilter, dateFrom, dateTo, formatFilter, regionFilter, searchQuery, statusFilter]);
+
+  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  }, []);
+
+  const handleStatusChange = useCallback((value: string) => {
+    setStatusFilter(value);
+  }, []);
+
+  const handleFormatChange = useCallback((value: string) => {
+    setFormatFilter(value);
+  }, []);
+
+  const handleRegionChange = useCallback((value: string) => {
+    setRegionFilter(value);
+  }, []);
+
+  const handleCityChange = useCallback((value: string) => {
+    setCityFilter(value);
+  }, []);
+
+  const handleDateFromChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setDateFrom(event.target.value);
+  }, []);
+
+  const handleDateToChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setDateTo(event.target.value);
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    const validationError = validateDateRange(dateFrom, dateTo);
+
+    setDateRangeError(validationError);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsFilterSheetOpen(false);
+    void loadEvents();
+  }, [dateFrom, dateTo, loadEvents]);
+
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setFormatFilter("");
+    setRegionFilter("");
+    setCityFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setDateRangeError(null);
+    setError(null);
+    setIsFilterSheetOpen(false);
+  }, []);
+
+  const sidebarFilters = useMemo(() => {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <h3 className="text-sm mb-4">Фильтры</h3>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Название</Label>
+          <Input value={searchQuery} onChange={handleSearchChange} placeholder="Название события..." />
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Статус</Label>
+          <Select value={statusFilter || ""} onValueChange={handleStatusChange}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="Все статусы" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Все статусы</SelectItem>
+              {statusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Формат</Label>
+          <Select value={formatFilter || ""} onValueChange={handleFormatChange}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="Любой" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Любой</SelectItem>
+              {formatOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Страна</Label>
+          <Select value={regionFilter || ""} onValueChange={handleRegionChange}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="Любая" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Любая</SelectItem>
+              {knownRegions.map((region) => (
+                <SelectItem key={region} value={region}>
+                  {region}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Город</Label>
+          <Select value={cityFilter || ""} onValueChange={handleCityChange}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="Любой" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Любой</SelectItem>
+              {knownCities.map((city) => (
+                <SelectItem key={city} value={city}>
+                  {city}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-1 gap-3 mb-4">
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Дата начала</Label>
+            <Input type="date" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Дата окончания</Label>
+            <Input type="date" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} />
+          </div>
+        </div>
+        {dateRangeError && (
+          <p className="text-xs text-destructive mb-4">{dateRangeError}</p>
+        )}
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={handleApplyFilters} disabled={Boolean(dateRangeError)}>
+            Применить
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+          >
+            Сбросить
+          </Button>
+        </div>
+      </div>
+    );
+  }, [
+    cityFilter,
+    dateFrom,
+    dateRangeError,
+    dateTo,
+    formatFilter,
+    formatOptions,
+    handleApplyFilters,
+    handleCityChange,
+    handleDateFromChange,
+    handleDateToChange,
+    handleFormatChange,
+    handleResetFilters,
+    handleSearchChange,
+    handleStatusChange,
+    handleRegionChange,
+    hasActiveFilters,
+    knownCities,
+    knownRegions,
+    searchQuery,
+    statusFilter,
+    statusOptions,
+  ]);
+
+  useEffect(() => {
+    onSidebarFiltersChange?.(sidebarFilters);
+  }, [onSidebarFiltersChange, sidebarFilters]);
+
+  useEffect(() => () => {
+    onSidebarFiltersChange?.(null);
+  }, [onSidebarFiltersChange]);
 
   const renderedEvents = useMemo(() => {
     const trimmedHighlight = highlightEventId?.trim();
@@ -80,6 +476,7 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
       const coverUrl = getEventCoverUrl(event);
       const eventDate = formatEventDate(event.eventDate);
       const formatLabel = getEventFormatLabel(event.format);
+      const statusLabel = getEventStatusLabel(event.status);
 
       return (
         <article
@@ -108,6 +505,15 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
+                {statusLabel && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <BadgeCheck className="w-4 h-4 text-blue-600" />
+                    <Badge variant="outline" className="text-xs font-medium">
+                      {statusLabel}
+                    </Badge>
+                  </div>
+                )}
+
                 {eventDate && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4 text-blue-600" />
@@ -165,10 +571,138 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
       <div className="bg-whiter from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
-        <h1 className="mb-2">События</h1>
-        <p className="text-muted-foreground">
-          Технологические конференции, meetup'ы и мероприятия для предпринимателей
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="mb-2">События</h1>
+            <p className="text-muted-foreground">
+              Технологические конференции, meetup'ы и мероприятия для предпринимателей
+            </p>
+          </div>
+
+          <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 lg:hidden">
+                <SlidersHorizontal className="w-4 h-4" />
+                Фильтры
+                {activeFiltersCount > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="bottom"
+              className="lg:hidden h-auto max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 pb-6"
+            >
+              <SheetHeader>
+                <SheetTitle>Фильтры</SheetTitle>
+              </SheetHeader>
+
+              <div className="space-y-4 mt-5">
+                <div className="space-y-2">
+                  <Label className="text-sm block">Название</Label>
+                  <Input value={searchQuery} onChange={handleSearchChange} placeholder="Название события..." />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Статус</Label>
+                  <Select value={statusFilter || ""} onValueChange={handleStatusChange}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Все статусы" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Все статусы</SelectItem>
+                      {statusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Формат</Label>
+                  <Select value={formatFilter || ""} onValueChange={handleFormatChange}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Любой" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Любой</SelectItem>
+                      {formatOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Страна</Label>
+                  <Select value={regionFilter || ""} onValueChange={handleRegionChange}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Любая" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Любая</SelectItem>
+                      {knownRegions.map((region) => (
+                        <SelectItem key={region} value={region}>
+                          {region}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Город</Label>
+                  <Select value={cityFilter || ""} onValueChange={handleCityChange}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Любой" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Любой</SelectItem>
+                      {knownCities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm block">Дата начала</Label>
+                    <Input type="date" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm block">Дата окончания</Label>
+                    <Input type="date" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} />
+                  </div>
+                </div>
+
+                {dateRangeError && <p className="text-sm text-destructive">{dateRangeError}</p>}
+
+                <div className="flex gap-2 pt-2">
+                  <Button className="flex-1" onClick={handleApplyFilters} disabled={Boolean(dateRangeError)}>
+                    Применить
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleResetFilters}
+                    disabled={!hasActiveFilters}
+                  >
+                    Сбросить
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       {isLoading && !hasEvents && (
@@ -189,6 +723,12 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
           >
             Повторить попытку
           </Button>
+        </div>
+      )}
+
+      {!isLoading && !error && !hasEvents && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-sm text-muted-foreground">
+          События не найдены. Попробуйте изменить фильтры.
         </div>
       )}
 
