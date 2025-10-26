@@ -76,10 +76,10 @@ export function Header() {
 
             {/* Auth buttons */}
             <div className="hidden md:flex items-center gap-3">
-              <Button variant="ghost" className="text-[#717182] hover:bg-[#717182]/10">
+              <Button variant="ghost" className="text-muted-foreground/10">
                 Войти
               </Button>
-              <Button className="bg-[#717182] hover:bg-[#717182]/90 text-white">
+              <Button className="text-muted-foreground /90 text-white">
                 Регистрация
               </Button>
             </div>
@@ -88,7 +88,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden text-[#717182] hover:bg-[#717182]/10"
+              className="lg:hidden text-muted-foreground/10"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? (

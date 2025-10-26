@@ -49,17 +49,17 @@ export function TopHeader({ onPageChange }: TopHeaderProps) {
               aria-label={isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"}
               title={isDark ? "Светлая тема" : "Тёмная тема"}
             >
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {isDark ? <Sun className="w-4 h-4 text-muted-foreground " /> : <Moon className="w-4 h-4 text-muted-foreground " />}
             </Button>
             <Popover open={searchOpen} onOpenChange={setSearchOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 border-gray-200"
+                  className="gap-2 text-muted-foreground "
                 >
                   <Search className="w-4 h-4" />
-                  <span className="hidden sm:inline">Поиск</span>
+                  <span className="hidden sm:inline text-muted-foreground ">Поиск</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -74,14 +74,14 @@ export function TopHeader({ onPageChange }: TopHeaderProps) {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 border-gray-200"
+              className="gap-2 text-muted-foreground"
               onClick={() => {
                 setSearchOpen(false);
                 onPageChange("contacts");
               }}
             >
               <Mail className="w-4 h-4" />
-              <span className="hidden lg:inline">Написать автору</span>
+              <span className="hidden lg:inline text-muted-foreground ">Написать автору</span>
             </Button>
           </div>
         </div>
