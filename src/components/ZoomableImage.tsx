@@ -1,4 +1,3 @@
-import { ZoomIn } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { cn } from "./ui/utils";
 
@@ -38,12 +37,6 @@ export function ZoomableImage({
           imageClassName,
         )}
       />
-      <div
-        className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-300 ease-out group-hover:bg-black/20"
-        aria-hidden="true"
-      >
-        <ZoomIn className="h-10 w-10 text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100 drop-shadow-lg" aria-hidden="true" />
-      </div>
     </div>
   );
 }
