@@ -96,8 +96,6 @@ export function NewsCard({
   excerpt,
   content,
   image,
-  category,
-  topic,
   date,
   likes,
   dislikes,
@@ -846,12 +844,7 @@ export function NewsCard({
     }
   };
 
-  const trimmedTopic = topic?.trim();
-  const trimmedCategory = category?.trim() ?? "";
-  const primaryLabel = trimmedTopic || trimmedCategory || undefined;
-  const secondaryLabel =
-    trimmedTopic && trimmedCategory && trimmedTopic !== trimmedCategory ? trimmedCategory : undefined;
-  const metaItems = [primaryLabel, secondaryLabel, date].filter(Boolean);
+  const metaItems = [date].filter(Boolean);
 
   return (
     <article
