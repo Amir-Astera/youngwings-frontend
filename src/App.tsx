@@ -1777,7 +1777,7 @@ export default function App() {
   }, [applyCountersUpdates, applyPersonalStateUpdates, debouncedVisibleIds]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background text-foreground transition-colors">
       <TopHeader />
       <MobileMenu currentPage={currentPage} onPageChange={setCurrentPage} />
       
