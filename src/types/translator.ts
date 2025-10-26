@@ -5,6 +5,7 @@ export interface TranslatorResponse {
   specialization?: string | null;
   experience?: string | null;
   location?: string | null;
+  photoUrl?: string | null;
   qrUrl?: string | null;
   nickname?: string | null;
   version?: number;
