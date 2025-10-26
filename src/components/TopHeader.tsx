@@ -12,11 +12,18 @@ export function TopHeader() {
   const isDark = theme === "dark";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background shadow-sm transition-colors">
-      <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6">
-        <div className="flex h-14 items-center gap-2 sm:gap-4 lg:grid lg:grid-cols-[240px_1fr_340px] lg:items-center lg:gap-10">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-colors">
+      <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: '1440px' }}>
+        <div 
+  className="flex h-14 items-center gap-2 sm:gap-4"
+  style={{
+    display: window.innerWidth >= 1024 ? 'grid' : 'flex',
+    gridTemplateColumns: window.innerWidth >= 1024 ? '240px 1fr 340px' : undefined,
+    gap: window.innerWidth >= 1024 ? '2.5rem' : undefined
+  }}
+>
           {/* Logo - aligned with left sidebar */}
-          <div className="flex-shrink-0 lg:col-start-1">
+          <div className="flex-shrink-0">
             <a href="/" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-[rgb(21,93,252)] rounded-lg flex items-center justify-center">
                 <span className="text-white text-sm">OV</span>
@@ -26,10 +33,10 @@ export function TopHeader() {
           </div>
 
           {/* Empty center space for alignment */}
-          <div className="hidden lg:block lg:col-start-2" aria-hidden="true" />
+          <div className="flex-1"></div>
 
           {/* Action buttons - aligned with right sidebar */}
-          <div className="flex justify-end gap-2 flex-shrink-0 ml-auto lg:ml-0 lg:col-start-3">
+          <div className="flex justify-end gap-2 flex-shrink-0">
             <Button
               variant="outline"
               size="sm"
