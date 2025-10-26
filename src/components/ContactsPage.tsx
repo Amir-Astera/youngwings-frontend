@@ -1,4 +1,12 @@
-import { Mail, Phone, MapPin, Send, MessageSquare } from "lucide-react";
+import {
+  Mail,
+  Phone,
+  Send,
+  MessageSquare,
+  Instagram,
+  Music4,
+  AtSign,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
@@ -76,19 +84,6 @@ export function ContactsPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm mb-1">Адрес</p>
-                  <p className="text-sm text-gray-600">
-                    г. Астана, пр. Мангилик Ел, 55/20<br />
-                    Бизнес-центр "Astana Hub"
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <MessageSquare className="w-5 h-5 text-orange-600" />
                 </div>
@@ -99,49 +94,56 @@ export function ContactsPage() {
                   </a>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Working Hours */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="mb-3">Время работы</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Понедельник - Пятница</span>
-                <span>09:00 - 18:00</span>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Music4 className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm mb-1">TikTok</p>
+                  <a
+                    href="https://www.tiktok.com/@youngwinds"
+                    className="text-sm text-purple-600 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    @youngwinds
+                  </a>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Суббота</span>
-                <span>10:00 - 15:00</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Воскресенье</span>
-                <span className="text-gray-500">Выходной</span>
-              </div>
-            </div>
-          </div>
 
-          {/* FAQ */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
-            <h3 className="mb-3">Часто задаваемые вопросы</h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm mb-1">Как стать автором?</p>
-                <p className="text-xs text-gray-600">
-                  Отправьте заявку на info@orientventus.kz с примерами ваших работ
-                </p>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Instagram className="w-5 h-5 text-pink-600" />
+                </div>
+                <div>
+                  <p className="text-sm mb-1">Instagram</p>
+                  <a
+                    href="https://www.instagram.com/youngwinds"
+                    className="text-sm text-pink-600 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    @youngwinds
+                  </a>
+                </div>
               </div>
-              <div>
-                <p className="text-sm mb-1">Размещение рекламы</p>
-                <p className="text-xs text-gray-600">
-                  Свяжитесь с нами по email для обсуждения рекламных возможностей
-                </p>
-              </div>
-              <div>
-                <p className="text-sm mb-1">Сотрудничество</p>
-                <p className="text-xs text-gray-600">
-                  Мы открыты к партнерству с компаниями и организациями
-                </p>
+
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <AtSign className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-sm mb-1">Threads</p>
+                  <a
+                    href="https://www.threads.net/@youngwinds"
+                    className="text-sm text-slate-600 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    @youngwinds
+                  </a>
+                </div>
               </div>
             </div>
           </div>
