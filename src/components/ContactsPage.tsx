@@ -24,9 +24,9 @@ export function ContactsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Contact Form */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm h-full flex flex-col">
           <h2 className="mb-4">Отправить сообщение</h2>
-          <form className="space-y-4">
+          <form className="flex flex-col gap-4 h-full">
             <div>
               <label className="text-sm mb-2 block text-gray-700">Ваше имя</label>
               <Input placeholder="Иван Иванов" />
@@ -41,12 +41,12 @@ export function ContactsPage() {
             </div>
             <div>
               <label className="text-sm mb-2 block text-gray-700">Сообщение</label>
-              <Textarea 
-                placeholder="Расскажите подробнее о вашем вопросе..." 
+              <Textarea
+                placeholder="Расскажите подробнее о вашем вопросе..."
                 rows={5}
               />
             </div>
-            <Button className="w-full gap-2">
+            <Button className="w-full gap-2 mt-auto">
               <Send className="w-4 h-4" />
               Отправить сообщение
             </Button>
@@ -54,9 +54,9 @@ export function ContactsPage() {
         </div>
 
         {/* Contact Information */}
-        <div className="space-y-6">
+        <div className="space-y-6 flex flex-col h-full">
           {/* Contact Cards */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex-1 flex flex-col">
             <h2 className="mb-4">Контактная информация</h2>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
@@ -95,56 +95,53 @@ export function ContactsPage() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Music4 className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm mb-1">TikTok</p>
-                  <a
-                    href="https://www.tiktok.com/@youngwinds"
-                    className="text-sm text-purple-600 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    @youngwinds
-                  </a>
-                </div>
-              </div>
+            </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Instagram className="w-5 h-5 text-pink-600" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-6">
+              <a
+                href="https://www.tiktok.com/@youngwinds"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/20">
+                  <Music4 className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm mb-1">Instagram</p>
-                  <a
-                    href="https://www.instagram.com/youngwinds"
-                    className="text-sm text-pink-600 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    @youngwinds
-                  </a>
+                  <p className="text-sm font-medium">TikTok</p>
+                  <p className="text-sm opacity-90">@youngwinds</p>
                 </div>
-              </div>
+              </a>
 
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <AtSign className="w-5 h-5 text-slate-600" />
+              <a
+                href="https://www.instagram.com/youngwinds"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-pink-500 via-rose-500 to-orange-400"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/20">
+                  <Instagram className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm mb-1">Threads</p>
-                  <a
-                    href="https://www.threads.net/@youngwinds"
-                    className="text-sm text-slate-600 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    @youngwinds
-                  </a>
+                  <p className="text-sm font-medium">Instagram</p>
+                  <p className="text-sm opacity-90">@youngwinds</p>
                 </div>
-              </div>
+              </a>
+
+              <a
+                href="https://www.threads.net/@youngwinds"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/20">
+                  <AtSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Threads</p>
+                  <p className="text-sm opacity-90">@youngwinds</p>
+                </div>
+              </a>
             </div>
           </div>
         </div>
