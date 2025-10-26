@@ -14,7 +14,7 @@ export function TopHeader() {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background shadow-sm transition-colors">
       <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6">
-        <div className="flex h-14 items-center gap-2 sm:gap-4 lg:grid lg:grid-cols-[240px_minmax(0,1fr)_340px] lg:items-center lg:gap-10">
+        <div className="flex h-14 items-center gap-2 sm:gap-4 lg:grid lg:grid-cols-[240px_1fr_340px] lg:items-center lg:gap-10">
           {/* Logo - aligned with left sidebar */}
           <div className="flex-shrink-0 lg:col-start-1">
             <a href="/" className="flex items-center gap-2">
@@ -29,7 +29,7 @@ export function TopHeader() {
           <div className="hidden lg:block lg:col-start-2" aria-hidden="true" />
 
           {/* Action buttons - aligned with right sidebar */}
-          <div className="flex items-center justify-end gap-2 flex-shrink-0 ml-auto lg:ml-0 lg:col-start-3">
+          <div className="flex justify-end gap-2 flex-shrink-0 ml-auto lg:ml-0 lg:col-start-3">
             <Button
               variant="outline"
               size="sm"
