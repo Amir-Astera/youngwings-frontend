@@ -12,7 +12,7 @@ export function TopHeader() {
   const isDark = theme === "dark";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-colors">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-white backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-colors">
       <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: '1440px' }}>
         <div 
   className="flex h-14 items-center gap-2 sm:gap-4"
