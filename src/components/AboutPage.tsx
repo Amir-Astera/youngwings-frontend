@@ -2,7 +2,7 @@ export function AboutPage() {
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-gray-200 rounded-xl p-8">
+      <div className="bg-white from-blue-50 via-indigo-50 to-purple-50 border border-gray-200 rounded-xl p-8">
         <h1 className="mb-4">О проекте YoungWinds</h1>
         <p className="text-lg text-gray-700 leading-relaxed">
           YoungWinds — независимая медиа-платформа, посвящённая бизнесу, стартапам и инновациям в Китае.

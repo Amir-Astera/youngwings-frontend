@@ -30,7 +30,7 @@ export function SubsectionPage({
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
+      <div className="bg-white from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
         <h1 className="mb-2">{title}</h1>
         <p className="text-muted-foreground">{description}</p>
       </div>

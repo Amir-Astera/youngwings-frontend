@@ -92,7 +92,7 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
                 {coverUrl ? (
                   <ImageWithFallback src={coverUrl} alt={event.title} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-xs text-muted-foreground">
+                  <div className="w-full h-full bg-white from-blue-50 to-indigo-50 flex items-center justify-center text-xs text-muted-foreground">
                     Без обложки
                   </div>
                 )}
@@ -164,7 +164,7 @@ export function EventsPage({ highlightEventId }: EventsPageProps) {
 
   return (
     <div className="space-y-3 sm:space-y-6 lg:pt-6 pt-1">
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
+      <div className="bg-whiter from-blue-50 to-indigo-50 border border-gray-200 rounded-xl p-6">
         <h1 className="mb-2">События</h1>
         <p className="text-muted-foreground">
           Технологические конференции, meetup'ы и мероприятия для предпринимателей
