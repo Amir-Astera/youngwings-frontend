@@ -481,19 +481,70 @@ export async function fetchAllPosts({
   };
 }
 
+export interface FetchEventsOptions {
+  page?: number;
+  size?: number;
+  status?: string;
+  format?: string;
+  region?: string;
+  location?: string;
+  title?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  signal?: AbortSignal;
+}
+
 export async function fetchEvents<T>({
   page = 1,
   size = 20,
+  status,
+  format,
+  region,
+  location,
+  title,
+  dateFrom,
+  dateTo,
   signal,
-}: {
-  page?: number;
-  size?: number;
-  signal?: AbortSignal;
-} = {}): Promise<PaginatedResponse<T>> {
+}: FetchEventsOptions = {}): Promise<PaginatedResponse<T>> {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
   });
+
+  const trimmedStatus = sanitizeString(status);
+  if (trimmedStatus) {
+    params.set("status", trimmedStatus);
+  }
+
+  const trimmedFormat = sanitizeString(format);
+  if (trimmedFormat) {
+    params.set("format", trimmedFormat);
+  }
+
+  const trimmedRegion = sanitizeString(region);
+  if (trimmedRegion) {
+    params.set("region", trimmedRegion);
+  }
+
+  const trimmedLocation = sanitizeString(location);
+  if (trimmedLocation) {
+    params.set("location", trimmedLocation);
+  }
+
+  const trimmedTitle = sanitizeString(title);
+  if (trimmedTitle) {
+    params.set("title", trimmedTitle);
+  }
+
+  const normalizedDateFrom = sanitizeString(dateFrom);
+  if (normalizedDateFrom) {
+    params.set("dateFrom", normalizedDateFrom);
+  }
+
+  const normalizedDateTo = sanitizeString(dateTo);
+  if (normalizedDateTo) {
+    params.set("dateTo", normalizedDateTo);
+  }
 
   const response = await apiRequest(`${EVENTS_ENDPOINT}?${params.toString()}`, {
     method: "GET",

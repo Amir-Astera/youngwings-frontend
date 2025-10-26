@@ -245,6 +245,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [viewingPost, setViewingPost] = useState(false);
   const [translatorsSidebarFilters, setTranslatorsSidebarFilters] = useState<ReactNode | null>(null);
+  const [eventsSidebarFilters, setEventsSidebarFilters] = useState<ReactNode | null>(null);
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [countersById, setCountersById] = useState<Record<string, PostCountersState>>({});
@@ -1925,7 +1926,12 @@ export default function App() {
               
               {currentPage.startsWith("subsection-") && renderPostView()}
 
-              {currentPage === "events" && <EventsPage highlightEventId={highlightedEventId} />}
+              {currentPage === "events" && (
+                <EventsPage
+                  highlightEventId={highlightedEventId}
+                  onSidebarFiltersChange={setEventsSidebarFilters}
+                />
+              )}
 
               {currentPage === "upcoming-events" && <UpcomingEventsPage onPageChange={setCurrentPage} />}
 
@@ -1982,7 +1988,9 @@ export default function App() {
                 filterContent={
                   currentPage === "translators"
                     ? translatorsSidebarFilters ?? undefined
-                    : currentPage === "exhibitions" ? (
+                    : currentPage === "events"
+                      ? eventsSidebarFilters ?? undefined
+                      : currentPage === "exhibitions" ? (
                     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                       <h3 className="text-sm mb-4">Фильтры</h3>
                       <div className="mb-4">
