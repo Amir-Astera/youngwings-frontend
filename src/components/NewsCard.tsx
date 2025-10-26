@@ -892,7 +892,11 @@ export function NewsCard({
           </a>
         </h3>
 
-        <p className={`text-sm text-muted-foreground leading-relaxed ${!isExpanded && "line-clamp-3"}`}>
+        <p
+          className={`text-sm text-black dark:text-white leading-relaxed ${
+            !isExpanded && "line-clamp-3"
+          }`}
+        >
           {excerpt}
         </p>
       </div>
@@ -926,7 +930,7 @@ export function NewsCard({
           {content ? (
             <TipTapContent content={content} className="space-y-4" />
           ) : (
-            <p className="text-sm text-muted-foreground leading-relaxed">{excerpt}</p>
+            <p className="text-sm text-black dark:text-white leading-relaxed">{excerpt}</p>
           )}
 
           <button onClick={() => setIsExpanded(false)} className="text-sm text-primary hover:underline">

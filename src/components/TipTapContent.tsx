@@ -89,11 +89,11 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
     case "paragraph": {
       const children = renderNodes(node.content, `${key}-paragraph`);
       if (!children) {
-        return <p key={key} className="text-sm text-muted-foreground leading-relaxed" />;
+        return <p key={key} className="text-sm text-black dark:text-white leading-relaxed" />;
       }
 
       return (
-        <p key={key} className="text-sm text-muted-foreground leading-relaxed">
+        <p key={key} className="text-sm text-black dark:text-white leading-relaxed">
           {children}
         </p>
       );
@@ -112,21 +112,25 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
       };
       const headingClass = sizeClasses[HeadingTag] ?? "text-lg font-semibold";
       return (
-        <HeadingTag key={key} className={classNames(headingClass, "text-gray-900")}>
+        <HeadingTag key={key} className={classNames(headingClass, "text-black dark:text-white")}>
           {renderNodes(node.content, `${key}-heading`)}
         </HeadingTag>
       );
     }
     case "bulletList":
       return (
-        <ul key={key} className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+        <ul key={key} className="list-disc list-inside space-y-2 text-sm text-black dark:text-white">
           {renderNodes(node.content, `${key}-bullet`)}
         </ul>
       );
     case "orderedList": {
       const start = typeof node.attrs?.start === "number" ? node.attrs.start : undefined;
       return (
-        <ol key={key} start={start} className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+        <ol
+          key={key}
+          start={start}
+          className="list-decimal list-inside space-y-2 text-sm text-black dark:text-white"
+        >
           {renderNodes(node.content, `${key}-ordered`)}
         </ol>
       );
@@ -137,7 +141,7 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
       return (
         <blockquote
           key={key}
-          className="border-l-4 border-blue-600 bg-gray-50 text-sm text-muted-foreground leading-relaxed italic rounded-r-lg px-4 py-3"
+          className="border-l-4 border-blue-600 bg-gray-50 text-sm text-black dark:text-white leading-relaxed italic rounded-r-lg px-4 py-3 dark:bg-gray-900/40"
         >
           {renderNodes(node.content, `${key}-blockquote`)}
         </blockquote>
