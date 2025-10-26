@@ -75,6 +75,9 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
   const location = response.location?.trim();
   const username = response.nickname?.trim();
   const photoUrl =
+    resolveFileUrl(response.photoUrl ?? undefined, {
+      defaultPrefix: "/api/files/thumbnail/ASSETS",
+    }) ??
     resolveFileUrl(response.qrUrl ?? undefined, {
       defaultPrefix: "/api/files/thumbnail/ASSETS",
     }) ?? undefined;
