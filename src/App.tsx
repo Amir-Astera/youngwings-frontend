@@ -1778,7 +1778,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors">
-      <TopHeader />
+      <TopHeader onPageChange={setCurrentPage} />
       <MobileMenu currentPage={currentPage} onPageChange={setCurrentPage} />
       
       <div className="mt-[104px] lg:mt-14">
