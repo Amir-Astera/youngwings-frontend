@@ -124,6 +124,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
   const [experienceQuery, setExperienceQuery] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTranslators, setTotalTranslators] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -148,6 +149,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
           languages: languagesFilter.length > 0 ? languagesFilter : undefined,
           specialization: selectedSpecialization ? [selectedSpecialization] : undefined,
           experience: experienceQuery,
+          location: selectedLocation,
           signal,
         });
 
@@ -194,6 +196,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
       pageSize,
       searchQuery,
       selectedLanguage,
+      selectedLocation,
       selectedSpecialization,
     ],
   );
@@ -264,6 +267,18 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     return uniqueExperiences.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
   }, [translators]);
 
+  const allLocations = useMemo(() => {
+    const uniqueLocations = Array.from(
+      new Set(
+        translators
+          .map((translator) => translator.location?.trim())
+          .filter((location): location is string => Boolean(location)),
+      ),
+    );
+
+    return uniqueLocations.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
+
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
     setCurrentPage(1);
@@ -279,6 +294,11 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     setCurrentPage(1);
   }, []);
 
+  const handleLocationChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLocation(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
   const handleExperienceChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
     setExperienceQuery(event.target.value);
     setCurrentPage(1);
@@ -288,6 +308,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     setSearchQuery("");
     setExperienceQuery("");
     setSelectedLanguage("");
+    setSelectedLocation("");
     setSelectedSpecialization("");
     setCurrentPage(1);
   }, []);
@@ -303,9 +324,10 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
         searchQuery.trim() ||
           experienceQuery.trim() ||
           selectedLanguage.trim() ||
+          selectedLocation.trim() ||
           selectedSpecialization.trim(),
       ),
-    [experienceQuery, searchQuery, selectedLanguage, selectedSpecialization],
+    [experienceQuery, searchQuery, selectedLanguage, selectedLocation, selectedSpecialization],
   );
 
   const sidebarFilters = useMemo(
@@ -347,6 +369,21 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
           </select>
         </div>
         <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Регион</Label>
+          <select
+            value={selectedLocation}
+            onChange={handleLocationChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любой</option>
+            {allLocations.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
           <Label className="text-xs text-muted-foreground mb-2 block">Опыт работы</Label>
           <select
             value={experienceQuery}
@@ -379,10 +416,12 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     [
       allExperiences,
       allLanguages,
+      allLocations,
       allSpecializations,
       experienceQuery,
       handleApplyFilters,
       handleExperienceChange,
+      handleLocationChange,
       handleResetFilters,
       handleSearchChange,
       handleLanguageChange,
@@ -390,6 +429,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
       hasActiveFilters,
       searchQuery,
       selectedLanguage,
+      selectedLocation,
       selectedSpecialization,
     ],
   );
@@ -430,18 +470,21 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
           {/* Filters Button */}
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button variant="outline" size="sm" className="gap-2 lg:hidden">
                 <SlidersHorizontal className="w-4 h-4" />
                 Фильтры
               </Button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
+            <SheetContent
+              side="bottom"
+              className="lg:hidden h-auto max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 pb-6"
+            >
               <SheetHeader>
                 <SheetTitle>Фильтры</SheetTitle>
               </SheetHeader>
-              <div className="space-y-6 mt-6">
-                <div>
-                  <Label className="text-sm mb-2 block">Поиск</Label>
+              <div className="space-y-4 mt-5">
+                <div className="space-y-2">
+                  <Label className="text-sm block">Поиск</Label>
                   <Input
                     value={searchQuery}
                     onChange={handleSearchChange}
@@ -449,8 +492,8 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                   />
                 </div>
 
-                <div>
-                  <Label className="text-sm mb-2 block">Язык</Label>
+                <div className="space-y-2">
+                  <Label className="text-sm block">Язык</Label>
                   <select
                     value={selectedLanguage}
                     onChange={handleLanguageChange}
@@ -465,8 +508,8 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                   </select>
                 </div>
 
-                <div>
-                  <Label className="text-sm mb-2 block">Тип услуги</Label>
+                <div className="space-y-2">
+                  <Label className="text-sm block">Тип услуги</Label>
                   <select
                     value={selectedSpecialization}
                     onChange={handleSpecializationChange}
@@ -481,8 +524,24 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                   </select>
                 </div>
 
-                <div>
-                  <Label className="text-sm mb-2 block">Опыт работы</Label>
+                <div className="space-y-2">
+                  <Label className="text-sm block">Регион</Label>
+                  <select
+                    value={selectedLocation}
+                    onChange={handleLocationChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allLocations.map((location) => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Опыт работы</Label>
                   <select
                     value={experienceQuery}
                     onChange={handleExperienceChange}
@@ -497,11 +556,17 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <Button className="w-full" onClick={handleApplyFilters}>
+                <div className="space-y-2 pt-2">
+                  <Button size="sm" className="w-full" onClick={handleApplyFilters}>
                     Применить
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={handleResetFilters} disabled={!hasActiveFilters}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleResetFilters}
+                    disabled={!hasActiveFilters}
+                  >
                     Сбросить фильтры
                   </Button>
                 </div>
@@ -606,7 +671,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                           disabled={!translator.photoUrl}
                         >
                           <ImageIcon className="w-4 h-4" />
-                          Фото
+                          QR
                         </Button>
                         <Button
                           size="sm"
@@ -624,7 +689,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                       {showUsername === translator.id && translator.username && (
                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                           <p className="text-sm text-blue-900">
-                            <span className="font-medium">Никнейм:</span> {translator.username}
+                            <span className="font-medium">Ватсап номер:</span> {translator.username}
                           </p>
                         </div>
                       )}
@@ -693,7 +758,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                             disabled={!translator.photoUrl}
                           >
                             <ImageIcon className="w-4 h-4" />
-                            Фото
+                            QR
                           </Button>
                           <Button
                             size="sm"
@@ -710,7 +775,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                         {showUsername === translator.id && translator.username && (
                           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                             <p className="text-sm text-blue-900">
-                              <span className="font-medium">Никнейм:</span> {translator.username}
+                              <span className="font-medium">Ватсап номер:</span> {translator.username}
                             </p>
                           </div>
                         )}
@@ -832,14 +897,14 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
       <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Фото переводчика</DialogTitle>
-            <DialogDescription>Просмотр фотографии переводчика</DialogDescription>
+            <DialogTitle>QR переводчика</DialogTitle>
+            <DialogDescription>Просмотр QR-кода переводчика</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center p-6">
             {selectedPhoto ? (
-              <ImageWithFallback src={selectedPhoto} alt="Фото переводчика" className="w-64 h-64 object-contain" />
+              <ImageWithFallback src={selectedPhoto} alt="QR переводчика" className="w-64 h-64 object-contain" />
             ) : (
-              <p className="text-sm text-muted-foreground">Фотография недоступна</p>
+              <p className="text-sm text-muted-foreground">QR-код недоступен</p>
             )}
           </div>
         </DialogContent>
