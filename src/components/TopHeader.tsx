@@ -13,8 +13,15 @@ export function TopHeader() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-colors">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-8">
-        <div className="flex lg:grid lg:grid-cols-[240px_1fr_380px] gap-2 sm:gap-4 lg:gap-8 h-14 items-center">
+      <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: '1440px' }}>
+        <div 
+  className="flex h-14 items-center gap-2 sm:gap-4"
+  style={{
+    display: window.innerWidth >= 1024 ? 'grid' : 'flex',
+    gridTemplateColumns: window.innerWidth >= 1024 ? '240px 1fr 340px' : undefined,
+    gap: window.innerWidth >= 1024 ? '2.5rem' : undefined
+  }}
+>
           {/* Logo - aligned with left sidebar */}
           <div className="flex-shrink-0">
             <a href="/" className="flex items-center gap-2">

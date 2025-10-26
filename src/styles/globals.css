@@ -213,3 +213,52 @@ html {
 select.scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+@media (min-width: 1024px) {
+  .main-grid-container {
+    display: grid !important;
+    grid-template-columns: 240px 1fr 340px !important;
+    gap: 2.5rem !important;
+    max-width: 1440px !important;
+  }
+
+  .header-grid-container {
+    display: grid !important;
+    grid-template-columns: 240px 1fr 340px !important;
+    gap: 2.5rem !important;
+  }
+}
+
+.main-grid-container,
+.header-grid-container {
+  max-width: 1440px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .main-grid-container,
+  .header-grid-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+.footer-container {
+  max-width: 1440px !important;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+@media (min-width: 640px) {
+  .footer-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
