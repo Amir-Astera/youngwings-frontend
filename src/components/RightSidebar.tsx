@@ -196,7 +196,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {filterContent && filterContent}
 
       {/* Popular Topics */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm">Популярные темы</h3>
@@ -216,8 +216,8 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
               onClick={() => onPageChange(`topic-${topic.name}`)}
               className="w-full flex items-center justify-between p-2 rounded-lg transition-colors text-left hover:bg-accent/60"
             >
-              <span className="text-sm text-foreground">{topic.name}</span>
-              <span className="text-xs text-blue-700 bg-blue-600/15 px-2 py-0.5 rounded-full dark:bg-blue-500/30 dark:text-blue-100">
+              <span className="text-sm text-card-foreground">{topic.name}</span>
+              <span className="text-xs text-blue-200 bg-blue-600/20 px-2 py-0.5 rounded-full dark:bg-blue-500/30 dark:text-blue-100">
                 {topic.count}
               </span>
             </button>
@@ -231,7 +231,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
 
       {/* Events - Hide on exhibitions and events pages */}
       {currentPage !== "exhibitions" && currentPage !== "events" && currentPage !== "upcoming-events" && (
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm">Ближайшие события</h3>
@@ -289,13 +289,13 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {/* Support Us */}
       <div
         ref={supportBlockRef}
-        className="bg-card border border-border rounded-xl p-5 shadow-sm transition-all duration-300"
+        className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-sm transition-all duration-300"
       >
         <div className="flex items-center gap-2 mb-3">
           <Heart className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm">Поддержите нас</h3>
         </div>
-        <p className="text-xs text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+        <p className="text-xs text-white/80 mb-4 leading-relaxed">
           OrientVentus — независимое издание. Ваша поддержка помогает нам создавать качественный контент.
         </p>
         <Button className="w-full bg-blue-600 hover:bg-blue-700">

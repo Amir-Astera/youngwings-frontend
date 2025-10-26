@@ -849,7 +849,7 @@ export function NewsCard({
   return (
     <article
       ref={cardRef}
-      className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
+      className="bg-card text-card-foreground border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
     >
       {/* Header */}
       <div className="p-5 pb-4">
@@ -858,7 +858,7 @@ export function NewsCard({
             <span className="text-white text-lg">OV</span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-foreground mb-0.5">OrientVentus</div>
+            <div className="text-sm text-card-foreground mb-0.5">OrientVentus</div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               {metaItems.map((item, index) => (
                 <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
@@ -946,7 +946,7 @@ export function NewsCard({
               disabled={isReactionPending}
               className={cn(
                 "gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors",
-                "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                "hover:text-card-foreground hover:bg-accent/60 dark:hover:bg-white/10",
                 isLiked && "text-primary hover:text-primary",
               )}
             >
@@ -962,7 +962,7 @@ export function NewsCard({
               disabled={isReactionPending}
               className={cn(
                 "gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors",
-                "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                "hover:text-card-foreground hover:bg-accent/60 dark:hover:bg-white/10",
                 isDisliked && "text-destructive hover:text-destructive",
               )}
             >
@@ -975,7 +975,7 @@ export function NewsCard({
               variant="ghost"
               size="sm"
               onClick={() => setShowComments((value) => !value)}
-              className="gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10"
+              className="gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors hover:text-card-foreground hover:bg-accent/60 dark:hover:bg-white/10"
             >
               <MessageCircle className="w-4 h-4" />
               <span className="text-sm">{commentCount}</span>
@@ -989,7 +989,7 @@ export function NewsCard({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10"
+                  className="gap-1 h-8 px-1.5 sm:px-2 text-muted-foreground transition-colors hover:text-card-foreground hover:bg-accent/60 dark:hover:bg-white/10"
                 >
                   <Share2 className="w-4 h-4" />
                 </Button>
@@ -1205,7 +1205,7 @@ export function NewsCard({
                       disabled={isPending}
                       className={cn(
                         "gap-1.5 h-7 px-2 text-xs text-muted-foreground transition-colors",
-                        "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                        "hover:text-card-foreground hover:bg-accent/60 dark:hover:bg-white/10",
                         reaction.liked && "text-primary hover:text-primary",
                       )}
                     >
@@ -1224,7 +1224,7 @@ export function NewsCard({
                       disabled={isPending}
                       className={cn(
                         "gap-1.5 h-7 px-2 text-xs text-muted-foreground transition-colors",
-                        "hover:text-foreground hover:bg-accent/60 dark:hover:bg-white/10",
+                        "hover:text-card-foreground hover:bg-accent/60 dark:hover:bg-white/10",
                         reaction.disliked && "text-destructive hover:text-destructive",
                       )}
                     >

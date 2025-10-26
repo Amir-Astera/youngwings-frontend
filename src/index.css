@@ -2525,8 +2525,8 @@
   --font-size: 16px;
   --background: #fff;
   --foreground: oklch(.145 0 0);
-  --card: #fff;
-  --card-foreground: oklch(.145 0 0);
+  --card: #212121;
+  --card-foreground: #f3f5fb;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(.145 0 0);
   --primary: #030213;
