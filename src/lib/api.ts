@@ -3,7 +3,7 @@ import type { SearchKind, SearchResponse, SearchResultItem } from "../types/sear
 import type { PostCountersUpdate, PostListResponse, PostMyState, PostResponse } from "../types/post";
 import { buildEventsUrl, buildPostUrl } from "./urls";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const POSTS_ENDPOINT = import.meta.env.VITE_API_POSTS_ENDPOINT ?? "/api/post/getAll";
 const EVENTS_ENDPOINT = import.meta.env.VITE_API_EVENTS_ENDPOINT ?? "/api/events";
 const UPCOMING_EVENTS_ENDPOINT =
