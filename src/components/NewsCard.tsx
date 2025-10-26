@@ -849,7 +849,7 @@ export function NewsCard({
   return (
     <article
       ref={cardRef}
-      className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
+      className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
     >
       {/* Header */}
       <div className="p-5 pb-4">
@@ -858,7 +858,7 @@ export function NewsCard({
             <span className="text-white text-lg">OV</span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-gray-900 mb-0.5">OrientVentus</div>
+            <div className="text-sm text-foreground mb-0.5">OrientVentus</div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               {metaItems.map((item, index) => (
                 <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
@@ -1094,7 +1094,7 @@ export function NewsCard({
 
       {/* Comments Section */}
       {showComments && (
-        <div className="border-t border-gray-100 dark:border-gray-800 px-5 py-4 bg-white dark:bg-gray-900">
+        <div className="border-t border-border px-5 py-4 bg-card">
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm">Комментарии ({commentCount})</h4>
             <Button
@@ -1171,7 +1171,7 @@ export function NewsCard({
             )}
 
             {pendingComment && (
-              <div className="bg-white dark:bg-gray-900 p-3 rounded-lg border border-dashed border-primary/40">
+              <div className="bg-card p-3 rounded-lg border border-dashed border-primary/40">
                 <div className="flex items-start justify-between mb-1">
                   <span className="text-sm">{getCommentAuthor(pendingComment.authorName)}</span>
                   <span className="text-xs text-blue-600">На модерации</span>
@@ -1190,7 +1190,7 @@ export function NewsCard({
               return (
                 <div
                   key={comment.id}
-                  className="bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-100 dark:border-gray-700"
+                  className="bg-card p-3 rounded-lg border border-border"
                 >
                   <div className="flex items-start justify-between mb-1">
                     <span className="text-sm">{getCommentAuthor(comment.authorName)}</span>
