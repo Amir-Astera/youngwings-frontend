@@ -1783,7 +1783,7 @@ export default function App() {
       
       <div className="mt-[104px] lg:mt-14">
         <main className="mx-auto lg:py-8 py-2">
-          <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_380px] gap-5 lg:gap-8 max-w-[1400px] mx-auto px-4 sm:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_340px] gap-5 lg:gap-10 max-w-[1440px] mx-auto px-4 sm:px-6">
             {/* Left Sidebar - Navigation */}
             <div className="hidden lg:block pt-6">
               <LeftSidebar currentPage={currentPage} onPageChange={setCurrentPage} />
@@ -2057,7 +2057,7 @@ export default function App() {
 
         {/* Footer */}
         <footer className="border-t border-gray-200 mt-16 bg-white">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-8">
             <div className="text-center text-sm text-muted-foreground">
               <p>© 2025 OrientVentus. Все права защищены.</p>
             </div>
