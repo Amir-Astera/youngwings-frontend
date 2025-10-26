@@ -97,7 +97,7 @@ export function ContactsPage() {
 
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-8">
               <a
                 href="https://www.tiktok.com/@youngwinds"
                 className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-500"
@@ -140,6 +140,21 @@ export function ContactsPage() {
                 <div>
                   <p className="text-sm font-medium">Threads</p>
                   <p className="text-sm opacity-90">@youngwinds</p>
+                </div>
+              </a>
+
+              <a
+                href="https://t.me/orientventus_kz"
+                className="flex items-center gap-3 rounded-xl p-4 text-white shadow-sm transition-transform transform hover:-translate-y-1 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/20">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Telegram</p>
+                  <p className="text-sm opacity-90">@orientventus_kz</p>
                 </div>
               </a>
             </div>
