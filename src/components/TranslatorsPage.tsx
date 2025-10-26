@@ -6,7 +6,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { Languages, MapPin, Clock, Image as ImageIcon, User, SlidersHorizontal } from "lucide-react";
+import { Languages, MapPin, Clock, Image as ImageIcon, User, SlidersHorizontal, CalendarDays } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
@@ -32,8 +32,14 @@ interface TranslatorItem {
   languages: string[];
   specialization?: string;
   location?: string;
+  region?: string;
   experience?: string;
   experienceYears?: number | null;
+  status?: string;
+  format?: string;
+  eventName?: string;
+  eventStartDate?: string;
+  eventEndDate?: string;
   username?: string;
   photoUrl?: string;
 }
@@ -73,6 +79,16 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
   const experience = response.experience?.trim();
   const specialization = response.specialization?.trim();
   const location = response.location?.trim();
+  const region = response.region?.trim();
+  const status = response.status?.trim();
+  const format = response.format?.trim();
+  const eventName = response.eventName?.trim();
+  const rawEventStartDate =
+    response.eventStartDate ?? response.eventDateFrom ?? response.eventDate ?? null;
+  const rawEventEndDate = response.eventEndDate ?? response.eventDateTo ?? null;
+  const eventStartDate =
+    typeof rawEventStartDate === "string" ? rawEventStartDate.trim() : undefined;
+  const eventEndDate = typeof rawEventEndDate === "string" ? rawEventEndDate.trim() : undefined;
   const username = response.nickname?.trim();
   const photoUrl =
     resolveFileUrl(response.qrUrl ?? undefined, {
@@ -85,8 +101,14 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
     languages,
     specialization: specialization || undefined,
     location: location || undefined,
+    region: region || undefined,
     experience: experience || undefined,
     experienceYears: parseExperienceYears(experience),
+    status: status || undefined,
+    format: format || undefined,
+    eventName: eventName || undefined,
+    eventStartDate: eventStartDate || undefined,
+    eventEndDate: eventEndDate || undefined,
     username: username || undefined,
     photoUrl,
   };
@@ -110,6 +132,45 @@ function getInitials(name?: string): string {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "П";
 }
 
+function formatDateSafe(value?: string): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = new Date(trimmed);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return trimmed;
+  }
+
+  try {
+    return parsed.toLocaleDateString("ru-RU");
+  } catch (error) {
+    return trimmed;
+  }
+}
+
+function formatEventPeriod(start?: string, end?: string): string | null {
+  const formattedStart = formatDateSafe(start);
+  const formattedEnd = formatDateSafe(end);
+
+  if (formattedStart && formattedEnd) {
+    if (formattedStart === formattedEnd) {
+      return formattedStart;
+    }
+
+    return `${formattedStart} — ${formattedEnd}`;
+  }
+
+  return formattedStart ?? formattedEnd ?? null;
+}
+
 interface TranslatorsPageProps {
   onSidebarFiltersChange?: (content: ReactNode | null) => void;
 }
@@ -124,7 +185,13 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
   const [experienceQuery, setExperienceQuery] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedRegion, setSelectedRegion] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedFormat, setSelectedFormat] = useState("");
+  const [eventNameQuery, setEventNameQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTranslators, setTotalTranslators] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -149,7 +216,13 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
           languages: languagesFilter.length > 0 ? languagesFilter : undefined,
           specialization: selectedSpecialization ? [selectedSpecialization] : undefined,
           experience: experienceQuery,
-          location: selectedLocation,
+          location: selectedCity,
+          region: selectedRegion,
+          status: selectedStatus,
+          format: selectedFormat,
+          eventName: eventNameQuery,
+          dateFrom,
+          dateTo,
           signal,
         });
 
@@ -196,7 +269,13 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
       pageSize,
       searchQuery,
       selectedLanguage,
-      selectedLocation,
+      selectedCity,
+      selectedRegion,
+      selectedStatus,
+      selectedFormat,
+      eventNameQuery,
+      dateFrom,
+      dateTo,
       selectedSpecialization,
     ],
   );
@@ -267,8 +346,8 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     return uniqueExperiences.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
   }, [translators]);
 
-  const allLocations = useMemo(() => {
-    const uniqueLocations = Array.from(
+  const allCities = useMemo(() => {
+    const uniqueCities = Array.from(
       new Set(
         translators
           .map((translator) => translator.location?.trim())
@@ -276,7 +355,43 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
       ),
     );
 
-    return uniqueLocations.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+    return uniqueCities.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
+
+  const allRegions = useMemo(() => {
+    const uniqueRegions = Array.from(
+      new Set(
+        translators
+          .map((translator) => translator.region?.trim())
+          .filter((region): region is string => Boolean(region)),
+      ),
+    );
+
+    return uniqueRegions.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
+
+  const allStatuses = useMemo(() => {
+    const uniqueStatuses = Array.from(
+      new Set(
+        translators
+          .map((translator) => translator.status?.trim())
+          .filter((status): status is string => Boolean(status)),
+      ),
+    );
+
+    return uniqueStatuses.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+  }, [translators]);
+
+  const allFormats = useMemo(() => {
+    const uniqueFormats = Array.from(
+      new Set(
+        translators
+          .map((translator) => translator.format?.trim())
+          .filter((format): format is string => Boolean(format)),
+      ),
+    );
+
+    return uniqueFormats.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
   }, [translators]);
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -294,8 +409,38 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     setCurrentPage(1);
   }, []);
 
-  const handleLocationChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedLocation(event.target.value);
+  const handleCityChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCity(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleRegionChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedRegion(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleStatusChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStatus(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleFormatChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedFormat(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleEventNameChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setEventNameQuery(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleDateFromChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setDateFrom(event.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleDateToChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setDateTo(event.target.value);
     setCurrentPage(1);
   }, []);
 
@@ -308,8 +453,14 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     setSearchQuery("");
     setExperienceQuery("");
     setSelectedLanguage("");
-    setSelectedLocation("");
+    setSelectedCity("");
+    setSelectedRegion("");
     setSelectedSpecialization("");
+    setSelectedStatus("");
+    setSelectedFormat("");
+    setEventNameQuery("");
+    setDateFrom("");
+    setDateTo("");
     setCurrentPage(1);
   }, []);
 
@@ -324,10 +475,28 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
         searchQuery.trim() ||
           experienceQuery.trim() ||
           selectedLanguage.trim() ||
-          selectedLocation.trim() ||
-          selectedSpecialization.trim(),
+          selectedCity.trim() ||
+          selectedRegion.trim() ||
+          selectedSpecialization.trim() ||
+          selectedStatus.trim() ||
+          selectedFormat.trim() ||
+          eventNameQuery.trim() ||
+          dateFrom.trim() ||
+          dateTo.trim(),
       ),
-    [experienceQuery, searchQuery, selectedLanguage, selectedLocation, selectedSpecialization],
+    [
+      dateFrom,
+      dateTo,
+      eventNameQuery,
+      experienceQuery,
+      searchQuery,
+      selectedCity,
+      selectedFormat,
+      selectedLanguage,
+      selectedRegion,
+      selectedSpecialization,
+      selectedStatus,
+    ],
   );
 
   const sidebarFilters = useMemo(
@@ -337,6 +506,82 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
         <div className="mb-4">
           <Label className="text-xs text-muted-foreground mb-2 block">Поиск</Label>
           <Input value={searchQuery} onChange={handleSearchChange} placeholder="Имя или услуга..." />
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Название события</Label>
+          <Input
+            value={eventNameQuery}
+            onChange={handleEventNameChange}
+            placeholder="Например, конференция"
+          />
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Статус</Label>
+          <select
+            value={selectedStatus}
+            onChange={handleStatusChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любой</option>
+            {allStatuses.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Формат</Label>
+          <select
+            value={selectedFormat}
+            onChange={handleFormatChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любой</option>
+            {allFormats.map((format) => (
+              <option key={format} value={format}>
+                {format}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Страна</Label>
+          <select
+            value={selectedRegion}
+            onChange={handleRegionChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любая</option>
+            {allRegions.map((region) => (
+              <option key={region} value={region}>
+                {region}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Город</Label>
+          <select
+            value={selectedCity}
+            onChange={handleCityChange}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            <option value="">Любой</option>
+            {allCities.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-4">
+          <Label className="text-xs text-muted-foreground mb-2 block">Период проведения</Label>
+          <div className="flex items-center gap-2">
+            <Input type="date" value={dateFrom} onChange={handleDateFromChange} className="text-sm" />
+            <span className="text-muted-foreground text-xs">—</span>
+            <Input type="date" value={dateTo} onChange={handleDateToChange} className="text-sm" />
+          </div>
         </div>
         <div className="mb-4">
           <Label className="text-xs text-muted-foreground mb-2 block">Язык</Label>
@@ -364,21 +609,6 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
             {allSpecializations.map((specialization) => (
               <option key={specialization} value={specialization}>
                 {specialization}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mb-4">
-          <Label className="text-xs text-muted-foreground mb-2 block">Регион</Label>
-          <select
-            value={selectedLocation}
-            onChange={handleLocationChange}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-          >
-            <option value="">Любой</option>
-            {allLocations.map((location) => (
-              <option key={location} value={location}>
-                {location}
               </option>
             ))}
           </select>
@@ -415,21 +645,36 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
     ),
     [
       allExperiences,
+      allFormats,
       allLanguages,
-      allLocations,
+      allCities,
+      allRegions,
+      allStatuses,
       allSpecializations,
+      dateFrom,
+      dateTo,
+      eventNameQuery,
       experienceQuery,
       handleApplyFilters,
+      handleCityChange,
+      handleDateFromChange,
+      handleDateToChange,
+      handleEventNameChange,
       handleExperienceChange,
-      handleLocationChange,
+      handleFormatChange,
+      handleRegionChange,
       handleResetFilters,
       handleSearchChange,
       handleLanguageChange,
+      handleStatusChange,
       handleSpecializationChange,
+      selectedCity,
+      selectedFormat,
+      selectedRegion,
+      selectedStatus,
       hasActiveFilters,
-      searchQuery,
       selectedLanguage,
-      selectedLocation,
+      searchQuery,
       selectedSpecialization,
     ],
   );
@@ -493,6 +738,88 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                 </div>
 
                 <div className="space-y-2">
+                  <Label className="text-sm block">Название события</Label>
+                  <Input
+                    value={eventNameQuery}
+                    onChange={handleEventNameChange}
+                    placeholder="Например, конференция"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Статус</Label>
+                  <select
+                    value={selectedStatus}
+                    onChange={handleStatusChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Формат</Label>
+                  <select
+                    value={selectedFormat}
+                    onChange={handleFormatChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allFormats.map((format) => (
+                      <option key={format} value={format}>
+                        {format}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Страна</Label>
+                  <select
+                    value={selectedRegion}
+                    onChange={handleRegionChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любая</option>
+                    {allRegions.map((region) => (
+                      <option key={region} value={region}>
+                        {region}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Город</Label>
+                  <select
+                    value={selectedCity}
+                    onChange={handleCityChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    <option value="">Любой</option>
+                    {allCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm block">Период проведения</Label>
+                  <div className="flex items-center gap-2">
+                    <Input type="date" value={dateFrom} onChange={handleDateFromChange} className="text-sm" />
+                    <span className="text-muted-foreground text-xs">—</span>
+                    <Input type="date" value={dateTo} onChange={handleDateToChange} className="text-sm" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <Label className="text-sm block">Язык</Label>
                   <select
                     value={selectedLanguage}
@@ -519,22 +846,6 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                     {allSpecializations.map((specialization) => (
                       <option key={specialization} value={specialization}>
                         {specialization}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm block">Регион</Label>
-                  <select
-                    value={selectedLocation}
-                    onChange={handleLocationChange}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="">Любой</option>
-                    {allLocations.map((location) => (
-                      <option key={location} value={location}>
-                        {location}
                       </option>
                     ))}
                   </select>
@@ -600,11 +911,14 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                 </p>
               </div>
             ) : (
-              translators.map((translator) => (
-                <div
-                  key={translator.id}
-                  className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                >
+              translators.map((translator) => {
+                const eventPeriod = formatEventPeriod(translator.eventStartDate, translator.eventEndDate);
+
+                return (
+                  <div
+                    key={translator.id}
+                    className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                  >
                   <div className="p-6">
                     {/* Mobile Layout */}
                     <div className="md:hidden space-y-4">
@@ -626,7 +940,11 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                           <h3 className="mb-2">{translator.name}</h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <MapPin className="w-4 h-4" />
-                            <span>{translator.location ?? "Локация не указана"}</span>
+                            <span>
+                              {translator.region && translator.location
+                                ? `${translator.region}, ${translator.location}`
+                                : translator.region ?? translator.location ?? "Локация не указана"}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock className="w-4 h-4" />
@@ -634,6 +952,33 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                           </div>
                         </div>
                       </div>
+
+                      {/* Event info */}
+                      {(translator.eventName || eventPeriod || translator.status || translator.format) && (
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          {translator.eventName && (
+                            <p>
+                              <span className="text-gray-900">Событие:</span> {translator.eventName}
+                            </p>
+                          )}
+                          {eventPeriod && (
+                            <div className="flex items-center gap-2">
+                              <CalendarDays className="w-4 h-4" />
+                              <span>{eventPeriod}</span>
+                            </div>
+                          )}
+                          {translator.status && (
+                            <p>
+                              <span className="text-gray-900">Статус:</span> {translator.status}
+                            </p>
+                          )}
+                          {translator.format && (
+                            <p>
+                              <span className="text-gray-900">Формат:</span> {translator.format}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Languages */}
                       <div>
@@ -695,7 +1040,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                       )}
                     </div>
 
-                    {/* Desktop Layout */}
+                      {/* Desktop Layout */}
                     <div className="hidden md:flex gap-6">
                       {/* Photo - Left Side */}
                       <Avatar className="w-32 h-32 rounded-xl">
@@ -713,16 +1058,45 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
 
                       {/* Content - Right Side */}
                       <div className="flex-1">
-                        <div className="mb-3">
+                        <div className="mb-3 space-y-2">
                           <h3 className="mb-2">{translator.name}</h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <MapPin className="w-4 h-4" />
-                            <span>{translator.location ?? "Локация не указана"}</span>
+                            <span>
+                              {translator.region && translator.location
+                                ? `${translator.region}, ${translator.location}`
+                                : translator.region ?? translator.location ?? "Локация не указана"}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock className="w-4 h-4" />
                             <span>Опыт: {translator.experience ?? "не указан"}</span>
                           </div>
+                          {(translator.eventName || eventPeriod || translator.status || translator.format) && (
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                              {translator.eventName && (
+                                <p>
+                                  <span className="text-gray-900">Событие:</span> {translator.eventName}
+                                </p>
+                              )}
+                              {eventPeriod && (
+                                <div className="flex items-center gap-2">
+                                  <CalendarDays className="w-4 h-4" />
+                                  <span>{eventPeriod}</span>
+                                </div>
+                              )}
+                              {translator.status && (
+                                <p>
+                                  <span className="text-gray-900">Статус:</span> {translator.status}
+                                </p>
+                              )}
+                              {translator.format && (
+                                <p>
+                                  <span className="text-gray-900">Формат:</span> {translator.format}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="mb-3">
@@ -783,7 +1157,8 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                     </div>
                   </div>
                 </div>
-              ))
+              );
+            })
             )}
         </div>
 
