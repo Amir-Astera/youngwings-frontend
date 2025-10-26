@@ -6,7 +6,11 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useTheme } from "../lib/theme";
 
-export function TopHeader() {
+interface TopHeaderProps {
+  onPageChange: (page: string) => void;
+}
+
+export function TopHeader({ onPageChange }: TopHeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
@@ -67,7 +71,15 @@ export function TopHeader() {
               </PopoverContent>
             </Popover>
             
-            <Button variant="outline" size="sm" className="gap-2 border-gray-200">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-gray-200"
+              onClick={() => {
+                setSearchOpen(false);
+                onPageChange("contacts");
+              }}
+            >
               <Mail className="w-4 h-4" />
               <span className="hidden lg:inline">Написать автору</span>
             </Button>

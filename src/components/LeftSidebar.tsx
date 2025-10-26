@@ -27,7 +27,7 @@ export function LeftSidebar({ currentPage, onPageChange }: LeftSidebarProps) {
           onClick={() => onPageChange("home")}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all w-full text-left ${
             currentPage === "home"
-              ? "bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-blue-600 backdrop-blur-sm border border-blue-200/50 shadow-sm"
+              ? "bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-black backdrop-blur-sm border border-blue-200/50 shadow-sm"
               : "text-gray-700 hover:bg-gray-50"
           }`}
         >
@@ -45,7 +45,7 @@ export function LeftSidebar({ currentPage, onPageChange }: LeftSidebarProps) {
                 onClick={() => onPageChange(`subsection-${section}`)}
                 className={`block w-full text-left px-2 py-1.5 text-sm transition-colors font-normal whitespace-nowrap overflow-hidden text-ellipsis rounded-lg ${
                   currentPage === `subsection-${section}`
-                    ? "text-blue-600 bg-blue-50"
+                    ? "text-black bg-blue-50"
                     : "text-gray-900 hover:text-blue-600 hover:bg-gray-50"
                 }`}
               >
@@ -62,7 +62,7 @@ export function LeftSidebar({ currentPage, onPageChange }: LeftSidebarProps) {
           onClick={() => onPageChange("exhibitions")}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all w-full text-left ${
             currentPage === "exhibitions"
-              ? "bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-blue-600 backdrop-blur-sm border border-blue-200/50 shadow-sm"
+              ? "bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-black backdrop-blur-sm border border-blue-200/50 shadow-sm"
               : "text-gray-700 hover:bg-gray-50"
           }`}
         >
@@ -74,7 +74,7 @@ export function LeftSidebar({ currentPage, onPageChange }: LeftSidebarProps) {
           onClick={() => onPageChange("translators")}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all w-full text-left ${
             currentPage === "translators"
-              ? "bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-blue-600 backdrop-blur-sm border border-blue-200/50 shadow-sm"
+              ? "bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-black backdrop-blur-sm border border-blue-200/50 shadow-sm"
               : "text-gray-700 hover:bg-gray-50"
           }`}
         >
