@@ -91,6 +91,9 @@ function mapTranslatorResponse(response: TranslatorResponse): TranslatorItem {
   const eventEndDate = typeof rawEventEndDate === "string" ? rawEventEndDate.trim() : undefined;
   const username = response.nickname?.trim();
   const photoUrl =
+    resolveFileUrl(response.photoUrl ?? undefined, {
+      defaultPrefix: "/api/files/thumbnail/ASSETS",
+    }) ??
     resolveFileUrl(response.qrUrl ?? undefined, {
       defaultPrefix: "/api/files/thumbnail/ASSETS",
     }) ?? undefined;

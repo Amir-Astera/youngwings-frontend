@@ -14,6 +14,7 @@ export interface TranslatorResponse {
   eventDateFrom?: string | null;
   eventDateTo?: string | null;
   eventDate?: string | null;
+  photoUrl?: string | null;
   qrUrl?: string | null;
   nickname?: string | null;
   version?: number;
