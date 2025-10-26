@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Eye,
@@ -21,6 +21,7 @@ import type {
   SearchResultPost,
   SearchResultTopic,
 } from "../types/search";
+import { buildEventsPath, buildPostPath } from "../lib/urls";
 
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -277,6 +278,56 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
     }));
   };
 
+  const navigateToPath = useCallback(
+    (path: string, state: Record<string, unknown> = {}) => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      try {
+        window.history.pushState(state, "", path);
+
+        if (typeof PopStateEvent === "function") {
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        } else {
+          window.dispatchEvent(new Event("popstate"));
+        }
+      } catch {
+        window.location.href = path;
+      }
+
+      onClose?.();
+    },
+    [onClose],
+  );
+
+  const handlePostNavigation = useCallback(
+    (postId?: string | null) => {
+      const trimmed = postId?.toString().trim();
+
+      if (!trimmed) {
+        return;
+      }
+
+      navigateToPath(buildPostPath(trimmed), { postId: trimmed });
+    },
+    [navigateToPath],
+  );
+
+  const handleEventNavigation = useCallback(
+    (eventId?: string | null) => {
+      const trimmed = eventId?.toString().trim() || undefined;
+      const state: Record<string, unknown> = { section: "events" };
+
+      if (trimmed) {
+        state.event = trimmed;
+      }
+
+      navigateToPath(buildEventsPath(trimmed), state);
+    },
+    [navigateToPath],
+  );
+
   const renderPost = (item: SearchResultPost) => {
     const thumbnail = resolveThumbnail(item.thumbnail);
     const createdAt = formatPostDate(item.createdAt);
@@ -309,9 +360,13 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight text-foreground">
+            <button
+              type="button"
+              onClick={() => handlePostNavigation(item.id)}
+              className="line-clamp-2 text-left text-sm font-semibold leading-tight text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
               {item.title || "Без названия"}
-            </p>
+            </button>
             {item.snippet && (
               <p
                 className="mt-1 line-clamp-3 text-sm text-muted-foreground"
@@ -357,9 +412,13 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             {item.region && <span className="rounded-full bg-muted px-2 py-0.5">{item.region}</span>}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight text-foreground">
+            <button
+              type="button"
+              onClick={() => handleEventNavigation(item.id)}
+              className="text-left text-sm font-semibold leading-tight text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
               {item.title || "Без названия"}
-            </p>
+            </button>
             {item.snippet && (
               <p
                 className="mt-1 line-clamp-3 text-sm text-muted-foreground"
@@ -525,7 +584,7 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             Страница {state.page} из {Math.max(1, Math.ceil(Math.max(state.total, 1) / state.size || 1))}
           </span>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+        <div className="flex-1 space-y-4 overflow-y-auto pr-2 pb-4">
           {topics.length > 0 && renderTopics(topics)}
           {posts.length > 0 && (
             <div className="space-y-3">
@@ -571,7 +630,7 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
   };
 
   return (
-    <div className="flex h-full min-h-[360px] w-full flex-col">
+    <div className="flex h-full min-h-[360px] w-full max-h-[min(80vh,600px)] flex-col overflow-hidden">
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">Поиск</h3>
@@ -617,7 +676,11 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
           )}
         </div>
       </div>
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="flex-1">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as TabKey)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
         <div className="border-b border-border px-4 pt-3">
           <TabsList className="bg-transparent p-0">
             <TabsTrigger value="all" className="rounded-full px-4 py-1 text-sm">
@@ -631,18 +694,18 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             </TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="all" className="flex-1 overflow-hidden">
-          <div className="max-h-[400px] overflow-y-auto px-4 py-3">
+        <TabsContent value="all" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-3">
             {renderResults("all")}
           </div>
         </TabsContent>
-        <TabsContent value="post" className="flex-1 overflow-hidden">
-          <div className="max-h-[400px] overflow-y-auto px-4 py-3">
+        <TabsContent value="post" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-3">
             {renderResults("post")}
           </div>
         </TabsContent>
-        <TabsContent value="event" className="flex-1 overflow-hidden">
-          <div className="max-h-[400px] overflow-y-auto px-4 py-3">
+        <TabsContent value="event" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-3">
             {renderResults("event")}
           </div>
         </TabsContent>
