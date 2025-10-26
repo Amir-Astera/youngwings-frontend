@@ -233,6 +233,12 @@ interface FetchTranslatorVacanciesOptions {
   specialization?: ArrayParam;
   experience?: string;
   location?: string;
+  region?: string;
+  status?: string;
+  format?: string;
+  eventName?: string;
+  dateFrom?: string;
+  dateTo?: string;
   signal?: AbortSignal;
 }
 
@@ -726,6 +732,12 @@ export async function fetchTranslatorVacancies<T>({
   specialization,
   experience,
   location,
+  region,
+  status,
+  format,
+  eventName,
+  dateFrom,
+  dateTo,
   signal,
 }: FetchTranslatorVacanciesOptions = {}): Promise<PaginatedResponse<T>> {
   const params = new URLSearchParams({
@@ -756,6 +768,36 @@ export async function fetchTranslatorVacancies<T>({
   const trimmedLocation = location?.trim();
   if (trimmedLocation) {
     params.set("location", trimmedLocation);
+  }
+
+  const trimmedRegion = region?.trim();
+  if (trimmedRegion) {
+    params.set("region", trimmedRegion);
+  }
+
+  const trimmedStatus = status?.trim();
+  if (trimmedStatus) {
+    params.set("status", trimmedStatus);
+  }
+
+  const trimmedFormat = format?.trim();
+  if (trimmedFormat) {
+    params.set("format", trimmedFormat);
+  }
+
+  const trimmedEventName = eventName?.trim();
+  if (trimmedEventName) {
+    params.set("eventName", trimmedEventName);
+  }
+
+  const trimmedDateFrom = dateFrom?.trim();
+  if (trimmedDateFrom) {
+    params.set("dateFrom", trimmedDateFrom);
+  }
+
+  const trimmedDateTo = dateTo?.trim();
+  if (trimmedDateTo) {
+    params.set("dateTo", trimmedDateTo);
   }
 
   const response = await apiRequest(`${TRANSLATOR_VACANCIES_ENDPOINT}?${params.toString()}`, {
