@@ -91,14 +91,14 @@ export function EventsPage({
   const [statusFilter, setStatusFilter] = useState("");
   const [formatFilter, setFormatFilter] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
-  const [cityFilter, setCityFilter] = useState("");
+  const [sphereFilter, setSphereFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [dateRangeError, setDateRangeError] = useState<string | null>(null);
   const [knownStatuses, setKnownStatuses] = useState<string[]>([]);
   const [knownFormats, setKnownFormats] = useState<string[]>([]);
   const [knownRegions, setKnownRegions] = useState<string[]>([]);
-  const [knownCities, setKnownCities] = useState<string[]>([]);
+  const [knownSpheres, setKnownSpheres] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export function EventsPage({
           status: statusFilter || undefined,
           format: formatFilter || undefined,
           region: regionFilter || undefined,
-          location: cityFilter || undefined,
+          sphere: sphereFilter || undefined,
           title: searchQuery || undefined,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
@@ -151,7 +151,7 @@ export function EventsPage({
         setKnownStatuses((prev) => mergeStringLists(prev, items.map((item) => item.status)));
         setKnownFormats((prev) => mergeStringLists(prev, items.map((item) => item.format)));
         setKnownRegions((prev) => mergeStringLists(prev, items.map((item) => item.region)));
-        setKnownCities((prev) => mergeStringLists(prev, items.map((item) => item.location)));
+        setKnownSpheres((prev) => mergeStringLists(prev, items.map((item) => item.sphere)));
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
@@ -166,7 +166,7 @@ export function EventsPage({
         }
       }
     },
-    [cityFilter, dateFrom, dateTo, formatFilter, regionFilter, searchQuery, statusFilter],
+    [dateFrom, dateTo, formatFilter, regionFilter, searchQuery, sphereFilter, statusFilter],
   );
 
   useEffect(() => {
@@ -250,11 +250,11 @@ export function EventsPage({
           statusFilter ||
           formatFilter ||
           regionFilter ||
-          cityFilter ||
+          sphereFilter ||
           dateFrom ||
           dateTo,
       ),
-    [cityFilter, dateFrom, dateTo, formatFilter, regionFilter, searchQuery, statusFilter],
+    [dateFrom, dateTo, formatFilter, regionFilter, searchQuery, sphereFilter, statusFilter],
   );
 
   const activeFiltersCount = useMemo(() => {
@@ -276,7 +276,7 @@ export function EventsPage({
       count += 1;
     }
 
-    if (cityFilter) {
+    if (sphereFilter) {
       count += 1;
     }
 
@@ -289,7 +289,7 @@ export function EventsPage({
     }
 
     return count;
-  }, [cityFilter, dateFrom, dateTo, formatFilter, regionFilter, searchQuery, statusFilter]);
+  }, [dateFrom, dateTo, formatFilter, regionFilter, searchQuery, sphereFilter, statusFilter]);
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
@@ -307,8 +307,8 @@ export function EventsPage({
     setRegionFilter(value);
   }, []);
 
-  const handleCityChange = useCallback((value: string) => {
-    setCityFilter(value);
+  const handleSphereChange = useCallback((value: string) => {
+    setSphereFilter(value);
   }, []);
 
   const handleDateFromChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -338,7 +338,7 @@ export function EventsPage({
     setStatusFilter("");
     setFormatFilter("");
     setRegionFilter("");
-    setCityFilter("");
+    setSphereFilter("");
     setDateFrom("");
     setDateTo("");
     setDateRangeError(null);
@@ -369,7 +369,7 @@ export function EventsPage({
 
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-search">
-              Название
+              Поиск
             </label>
             <input
               id="desktop-event-search"
@@ -421,7 +421,7 @@ export function EventsPage({
 
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-region">
-              Страна
+              Регион
             </label>
             <select
               id="desktop-event-region"
@@ -429,7 +429,7 @@ export function EventsPage({
               onChange={(event) => handleRegionChange(event.target.value)}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
-              <option value="">Любая</option>
+              <option value="">Любой</option>
               {knownRegions.map((region) => (
                 <option key={region} value={region}>
                   {region}
@@ -439,19 +439,19 @@ export function EventsPage({
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-city">
-              Город
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-sphere">
+              Сфера
             </label>
             <select
-              id="desktop-event-city"
-              value={cityFilter}
-              onChange={(event) => handleCityChange(event.target.value)}
+              id="desktop-event-sphere"
+              value={sphereFilter}
+              onChange={(event) => handleSphereChange(event.target.value)}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
-              <option value="">Любой</option>
-              {knownCities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
+              <option value="">Любая</option>
+              {knownSpheres.map((sphere) => (
+                <option key={sphere} value={sphere}>
+                  {sphere}
                 </option>
               ))}
             </select>
@@ -509,25 +509,25 @@ export function EventsPage({
     );
   }, [
     activeFiltersCount,
-    cityFilter,
     dateFrom,
     dateRangeError,
     dateTo,
     formatFilter,
     formatOptions,
-    handleCityChange,
     handleDesktopFiltersSubmit,
     handleDateFromChange,
     handleDateToChange,
     handleFormatChange,
+    handleRegionChange,
+    handleSphereChange,
     handleResetFilters,
     handleSearchChange,
     handleStatusChange,
-    handleRegionChange,
     hasActiveFilters,
-    knownCities,
     knownRegions,
+    knownSpheres,
     searchQuery,
+    sphereFilter,
     statusFilter,
     statusOptions,
   ]);
@@ -686,7 +686,7 @@ export function EventsPage({
 
               <div className="space-y-4 mt-5">
                 <div className="space-y-2">
-                  <Label className="text-sm block">Название</Label>
+                  <Label className="text-sm block">Поиск</Label>
                   <Input value={searchQuery} onChange={handleSearchChange} placeholder="Название события..." />
                 </div>
 
@@ -725,13 +725,13 @@ export function EventsPage({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm block">Страна</Label>
+                  <Label className="text-sm block">Регион</Label>
                   <Select value={regionFilter || ""} onValueChange={handleRegionChange}>
                     <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Любая" />
+                      <SelectValue placeholder="Любой" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Любая</SelectItem>
+                      <SelectItem value="">Любой</SelectItem>
                       {knownRegions.map((region) => (
                         <SelectItem key={region} value={region}>
                           {region}
@@ -742,16 +742,16 @@ export function EventsPage({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm block">Город</Label>
-                  <Select value={cityFilter || ""} onValueChange={handleCityChange}>
+                  <Label className="text-sm block">Сфера</Label>
+                  <Select value={sphereFilter || ""} onValueChange={handleSphereChange}>
                     <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Любой" />
+                      <SelectValue placeholder="Любая" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Любой</SelectItem>
-                      {knownCities.map((city) => (
-                        <SelectItem key={city} value={city}>
-                          {city}
+                      <SelectItem value="">Любая</SelectItem>
+                      {knownSpheres.map((sphere) => (
+                        <SelectItem key={sphere} value={sphere}>
+                          {sphere}
                         </SelectItem>
                       ))}
                     </SelectContent>
