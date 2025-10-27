@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { BadgeCheck, Calendar, Globe2, MapPin, MapPinned, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -323,115 +331,177 @@ export function EventsPage({ highlightEventId, onSidebarFiltersChange }: EventsP
     setIsFilterSheetOpen(false);
   }, []);
 
+  const handleDesktopFiltersSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      handleApplyFilters();
+    },
+    [handleApplyFilters],
+  );
+
   const sidebarFilters = useMemo(() => {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-        <h3 className="text-sm mb-4">Фильтры</h3>
-        <div className="mb-4">
-          <Label className="text-xs text-muted-foreground mb-2 block">Название</Label>
-          <Input value={searchQuery} onChange={handleSearchChange} placeholder="Название события..." />
-        </div>
-        <div className="mb-4">
-          <Label className="text-xs text-muted-foreground mb-2 block">Статус</Label>
-          <Select value={statusFilter || ""} onValueChange={handleStatusChange}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Все статусы" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Все статусы</SelectItem>
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <form className="space-y-5" onSubmit={handleDesktopFiltersSubmit}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">Фильтры</h3>
+            {activeFiltersCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+                {activeFiltersCount}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-search">
+              Название
+            </label>
+            <input
+              id="desktop-event-search"
+              type="text"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder="Название события..."
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-status">
+              Статус
+            </label>
+            <select
+              id="desktop-event-status"
+              value={statusFilter}
+              onChange={(event) => handleStatusChange(event.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Все статусы</option>
               {statusOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <option key={option.value} value={option.value}>
                   {option.label}
-                </SelectItem>
+                </option>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="mb-4">
-          <Label className="text-xs text-muted-foreground mb-2 block">Формат</Label>
-          <Select value={formatFilter || ""} onValueChange={handleFormatChange}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Любой" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Любой</SelectItem>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-format">
+              Формат
+            </label>
+            <select
+              id="desktop-event-format"
+              value={formatFilter}
+              onChange={(event) => handleFormatChange(event.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Любой</option>
               {formatOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <option key={option.value} value={option.value}>
                   {option.label}
-                </SelectItem>
+                </option>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="mb-4">
-          <Label className="text-xs text-muted-foreground mb-2 block">Страна</Label>
-          <Select value={regionFilter || ""} onValueChange={handleRegionChange}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Любая" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Любая</SelectItem>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-region">
+              Страна
+            </label>
+            <select
+              id="desktop-event-region"
+              value={regionFilter}
+              onChange={(event) => handleRegionChange(event.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Любая</option>
               {knownRegions.map((region) => (
-                <SelectItem key={region} value={region}>
+                <option key={region} value={region}>
                   {region}
-                </SelectItem>
+                </option>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="mb-4">
-          <Label className="text-xs text-muted-foreground mb-2 block">Город</Label>
-          <Select value={cityFilter || ""} onValueChange={handleCityChange}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Любой" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Любой</SelectItem>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-city">
+              Город
+            </label>
+            <select
+              id="desktop-event-city"
+              value={cityFilter}
+              onChange={(event) => handleCityChange(event.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Любой</option>
               {knownCities.map((city) => (
-                <SelectItem key={city} value={city}>
+                <option key={city} value={city}>
                   {city}
-                </SelectItem>
+                </option>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-1 gap-3 mb-4">
-          <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Дата начала</Label>
-            <Input type="date" value={dateFrom} onChange={handleDateFromChange} max={dateTo || undefined} />
+            </select>
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Дата окончания</Label>
-            <Input type="date" value={dateTo} onChange={handleDateToChange} min={dateFrom || undefined} />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-date-from">
+                Дата начала
+              </label>
+              <input
+                id="desktop-event-date-from"
+                type="date"
+                value={dateFrom}
+                onChange={handleDateFromChange}
+                max={dateTo || undefined}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="desktop-event-date-to">
+                Дата окончания
+              </label>
+              <input
+                id="desktop-event-date-to"
+                type="date"
+                value={dateTo}
+                onChange={handleDateToChange}
+                min={dateFrom || undefined}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
           </div>
-        </div>
-        {dateRangeError && (
-          <p className="text-xs text-destructive mb-4">{dateRangeError}</p>
-        )}
-        <div className="flex gap-2">
-          <Button className="flex-1" onClick={handleApplyFilters} disabled={Boolean(dateRangeError)}>
-            Применить
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={handleResetFilters}
-            disabled={!hasActiveFilters}
-          >
-            Сбросить
-          </Button>
-        </div>
+
+          {dateRangeError && (
+            <p className="text-xs text-destructive">{dateRangeError}</p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <Button type="submit" className="flex-1" disabled={Boolean(dateRangeError)}>
+              Применить
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={handleResetFilters}
+              disabled={!hasActiveFilters}
+            >
+              Сбросить
+            </Button>
+          </div>
+        </form>
       </div>
     );
   }, [
+    activeFiltersCount,
     cityFilter,
     dateFrom,
     dateRangeError,
     dateTo,
     formatFilter,
     formatOptions,
-    handleApplyFilters,
     handleCityChange,
+    handleDesktopFiltersSubmit,
     handleDateFromChange,
     handleDateToChange,
     handleFormatChange,
