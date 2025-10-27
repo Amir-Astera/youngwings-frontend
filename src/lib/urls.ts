@@ -55,25 +55,67 @@ function getBasePathWithLeadingSlash(): string {
   return ensureLeadingSlash(normalizedBase).replace(/\/{2,}/g, "/");
 }
 
-export function buildEventsPath(eventId?: string | null): string {
+type BuildEventsPathOptions = {
+  eventId?: string | null;
+  query?: string | null;
+};
+
+function isEventsPathOptions(value: unknown): value is BuildEventsPathOptions {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function buildEventsPath(eventId?: string | null): string;
+export function buildEventsPath(options?: BuildEventsPathOptions | null): string;
+export function buildEventsPath(
+  eventIdOrOptions?: string | null | BuildEventsPathOptions,
+): string {
   const normalizedBase = getBasePathWithLeadingSlash();
   const params = new URLSearchParams();
 
   params.set("section", "events");
 
-  const trimmedId = eventId?.trim();
+  let eventId: string | null | undefined;
+  let requestedQuery: string | null | undefined;
+
+  if (isEventsPathOptions(eventIdOrOptions)) {
+    eventId = eventIdOrOptions.eventId;
+    requestedQuery = eventIdOrOptions.query;
+  } else {
+    eventId = eventIdOrOptions;
+  }
+
+  const trimmedId = eventId?.toString().trim();
 
   if (trimmedId) {
     params.set("event", trimmedId);
   }
 
-  const query = params.toString();
+  const trimmedQuery = requestedQuery?.toString().trim();
 
-  return query ? `${normalizedBase}?${query}` : normalizedBase;
+  if (trimmedQuery) {
+    params.set("query", trimmedQuery);
+  }
+
+  const queryString = params.toString();
+
+  return queryString ? `${normalizedBase}?${queryString}` : normalizedBase;
 }
 
-export function buildEventsUrl(eventId?: string | null, origin?: string): string {
-  const path = buildEventsPath(eventId);
+export function buildEventsUrl(
+  eventId?: string | null,
+  origin?: string,
+): string;
+export function buildEventsUrl(
+  options?: BuildEventsPathOptions | null,
+  origin?: string,
+): string;
+export function buildEventsUrl(
+  eventIdOrOptions?: string | null | BuildEventsPathOptions,
+  origin?: string,
+): string {
+  const path = buildEventsPath(
+    isEventsPathOptions(eventIdOrOptions) ? eventIdOrOptions : eventIdOrOptions ?? undefined,
+  );
   const resolvedOrigin = resolveOrigin(origin);
 
   if (resolvedOrigin) {

@@ -315,15 +315,23 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
   );
 
   const handleEventNavigation = useCallback(
-    (eventId?: string | null) => {
-      const trimmed = eventId?.toString().trim() || undefined;
+    (eventId?: string | null, title?: string | null) => {
+      const trimmedId = eventId?.toString().trim() || undefined;
+      const trimmedTitle = title?.toString().trim() || undefined;
       const state: Record<string, unknown> = { section: "events" };
 
-      if (trimmed) {
-        state.event = trimmed;
+      if (trimmedId) {
+        state.event = trimmedId;
       }
 
-      navigateToPath(buildEventsPath(trimmed), state);
+      if (trimmedTitle) {
+        state.query = trimmedTitle;
+      }
+
+      navigateToPath(
+        buildEventsPath({ eventId: trimmedId, query: trimmedTitle }),
+        state,
+      );
     },
     [navigateToPath],
   );
@@ -336,9 +344,11 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
     const comments = typeof item.commentCount === "number" ? item.commentCount : 0;
 
     return (
-      <div
+      <button
         key={item.id ?? `${item.title ?? "post"}-${createdAt}`}
-        className="flex gap-3 rounded-lg border border-border bg-background p-3 hover:bg-muted/40"
+        type="button"
+        onClick={() => handlePostNavigation(item.id)}
+        className="group flex w-full gap-3 rounded-lg border border-border bg-background p-3 text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         {thumbnail ? (
           <img
@@ -360,13 +370,9 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             )}
           </div>
           <div className="min-w-0">
-            <button
-              type="button"
-              onClick={() => handlePostNavigation(item.id)}
-              className="line-clamp-2 text-left text-sm font-semibold leading-tight text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
+            <p className="line-clamp-2 text-sm font-semibold leading-tight text-foreground transition group-hover:text-primary">
               {item.title || "Без названия"}
-            </button>
+            </p>
             {item.snippet && (
               <p
                 className="mt-1 line-clamp-3 text-sm text-muted-foreground"
@@ -387,7 +393,7 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             </span>
           </div>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -397,9 +403,11 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
     const createdAt = formatPostDate(item.createdAt);
 
     return (
-      <div
+      <button
         key={item.id ?? `${item.title ?? "event"}-${date}`}
-        className="flex gap-3 rounded-lg border border-border bg-background p-3 hover:bg-muted/40"
+        type="button"
+        onClick={() => handleEventNavigation(item.id, item.title)}
+        className="group flex w-full gap-3 rounded-lg border border-border bg-background p-3 text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         {cover ? (
           <img src={cover} alt="" className="h-20 w-20 flex-shrink-0 rounded-md object-cover" />
@@ -412,13 +420,9 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             {item.region && <span className="rounded-full bg-muted px-2 py-0.5">{item.region}</span>}
           </div>
           <div className="min-w-0">
-            <button
-              type="button"
-              onClick={() => handleEventNavigation(item.id)}
-              className="text-left text-sm font-semibold leading-tight text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
+            <p className="text-sm font-semibold leading-tight text-foreground transition group-hover:text-primary">
               {item.title || "Без названия"}
-            </button>
+            </p>
             {item.snippet && (
               <p
                 className="mt-1 line-clamp-3 text-sm text-muted-foreground"
@@ -442,7 +446,7 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
             {createdAt && <span>Добавлено {createdAt}</span>}
           </div>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -510,7 +514,7 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
 
     if (!debouncedQuery) {
       return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-2 pb-6 text-center text-muted-foreground">
           <Search className="h-10 w-10" />
           <div>
             <p className="text-sm font-medium">Начните вводить запрос</p>
@@ -577,14 +581,14 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
     }
 
     return (
-      <div className="flex h-full flex-col gap-4">
+      <div className="flex h-full min-h-0 flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>Найдено {state.total}</span>
           <span>
             Страница {state.page} из {Math.max(1, Math.ceil(Math.max(state.total, 1) / state.size || 1))}
           </span>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto pr-2 pb-4">
+        <div className="flex-1 space-y-4 overflow-y-auto pr-2 pb-6">
           {topics.length > 0 && renderTopics(topics)}
           {posts.length > 0 && (
             <div className="space-y-3">
@@ -695,17 +699,17 @@ export function SearchPanel({ open, onClose }: SearchPanelProps) {
           </TabsList>
         </div>
         <TabsContent value="all" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className="flex h-full min-h-0 flex-col px-4 py-4">
             {renderResults("all")}
           </div>
         </TabsContent>
         <TabsContent value="post" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className="flex h-full min-h-0 flex-col px-4 py-4">
             {renderResults("post")}
           </div>
         </TabsContent>
         <TabsContent value="event" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div className="flex h-full min-h-0 flex-col px-4 py-4">
             {renderResults("event")}
           </div>
         </TabsContent>

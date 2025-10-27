@@ -67,10 +67,15 @@ function validateDateRange(start?: string, end?: string): string | null {
 
 interface EventsPageProps {
   highlightEventId?: string | null;
+  initialSearchQuery?: string;
   onSidebarFiltersChange?: (content: ReactNode | null) => void;
 }
 
-export function EventsPage({ highlightEventId, onSidebarFiltersChange }: EventsPageProps) {
+export function EventsPage({
+  highlightEventId,
+  initialSearchQuery,
+  onSidebarFiltersChange,
+}: EventsPageProps) {
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +92,16 @@ export function EventsPage({ highlightEventId, onSidebarFiltersChange }: EventsP
   const [knownRegions, setKnownRegions] = useState<string[]>([]);
   const [knownCities, setKnownCities] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof initialSearchQuery !== "string") {
+      return;
+    }
+
+    const normalized = initialSearchQuery.trim();
+
+    setSearchQuery((previous) => (previous === normalized ? previous : normalized));
+  }, [initialSearchQuery]);
 
   const loadEvents = useCallback(
     async (signal?: AbortSignal) => {

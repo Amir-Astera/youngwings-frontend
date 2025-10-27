@@ -97,7 +97,7 @@ export function buildPostShareUrl(postId?: string | null): string | undefined {
 export function buildEventShareUrl(eventId?: string | null): string {
   const trimmedId = eventId?.trim();
 
-  return buildEventsUrl(trimmedId);
+  return buildEventsUrl({ eventId: trimmedId });
 }
 
 export async function fetchPostShare(

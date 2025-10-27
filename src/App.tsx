@@ -246,6 +246,7 @@ export default function App() {
   const [viewingPost, setViewingPost] = useState(false);
   const [translatorsSidebarFilters, setTranslatorsSidebarFilters] = useState<ReactNode | null>(null);
   const [eventsSidebarFilters, setEventsSidebarFilters] = useState<ReactNode | null>(null);
+  const [eventsSearchQuery, setEventsSearchQuery] = useState<string>("");
   const [currentPostData, setCurrentPostData] = useState<PostSummary | null>(null);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [countersById, setCountersById] = useState<Record<string, PostCountersState>>({});
@@ -791,14 +792,18 @@ export default function App() {
       const params = new URLSearchParams(window.location.search || "");
       const section = params.get("section")?.trim().toLowerCase();
       const eventParam = params.get("event") ?? params.get("eventId");
+      const queryParam = params.get("query") ?? params.get("title");
 
       if (section === "events") {
         const trimmedEventId = eventParam?.trim() || null;
+        const trimmedQuery = queryParam?.trim() ?? "";
 
         setHighlightedEventId(trimmedEventId);
+        setEventsSearchQuery((previous) => (previous === trimmedQuery ? previous : trimmedQuery));
         setCurrentPage((previous) => (previous === "events" ? previous : "events"));
       } else {
         setHighlightedEventId(null);
+        setEventsSearchQuery((previous) => (previous === "" ? previous : ""));
       }
     };
 
@@ -825,6 +830,7 @@ export default function App() {
   useEffect(() => {
     if (currentPage !== "events") {
       setHighlightedEventId(null);
+      setEventsSearchQuery((previous) => (previous === "" ? previous : ""));
     }
   }, [currentPage]);
 
@@ -1929,6 +1935,7 @@ export default function App() {
               {currentPage === "events" && (
                 <EventsPage
                   highlightEventId={highlightedEventId}
+                  initialSearchQuery={eventsSearchQuery}
                   onSidebarFiltersChange={setEventsSidebarFilters}
                 />
               )}
