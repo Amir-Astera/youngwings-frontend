@@ -14,7 +14,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function getPreferredTheme(): Theme {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
 
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -23,7 +23,7 @@ function getPreferredTheme(): Theme {
     return stored;
   }
 
-  return "dark";
+  return "light";
 }
 
 function applyTheme(theme: Theme) {
