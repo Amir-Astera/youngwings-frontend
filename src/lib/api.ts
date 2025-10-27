@@ -488,6 +488,7 @@ export interface FetchEventsOptions {
   format?: string;
   region?: string;
   location?: string;
+  sphere?: string;
   title?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -501,6 +502,7 @@ export async function fetchEvents<T>({
   format,
   region,
   location,
+  sphere,
   title,
   dateFrom,
   dateTo,
@@ -529,6 +531,11 @@ export async function fetchEvents<T>({
   const trimmedLocation = sanitizeString(location);
   if (trimmedLocation) {
     params.set("location", trimmedLocation);
+  }
+
+  const trimmedSphere = sanitizeString(sphere);
+  if (trimmedSphere) {
+    params.set("sphere", trimmedSphere);
   }
 
   const trimmedTitle = sanitizeString(title);
