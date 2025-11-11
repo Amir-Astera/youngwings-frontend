@@ -28,6 +28,16 @@ import {
 import { formatRelativeTime } from "./lib/dates";
 import { useVisiblePosts } from "./lib/useVisiblePosts";
 import { buildPostPath, extractPostIdFromLocation, getBasePath } from "./lib/urls";
+import {
+  buildArticleSeoMetadata,
+  buildPageTitle,
+  DEFAULT_SEO_METADATA,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TAGLINE,
+  updateSeoMetadata,
+  type SeoMetadata,
+} from "./lib/seo";
 const APP_BASE_PATH = getBasePath();
 
 import type {
@@ -223,6 +233,88 @@ const subsectionDescriptions: { [key: string]: string } = {
 
 function getSubsectionDescription(subsection: string): string {
   return subsectionDescriptions[subsection] || "Актуальные материалы по теме";
+}
+
+const STATIC_PAGE_SEO: Record<string, { label?: string; description: string; keywords?: string[] }> = {
+  home: {
+    description: `${SITE_DESCRIPTION} ${SITE_TAGLINE}.`,
+    keywords: ["новости", "аналитика", "деловые тренды"],
+  },
+  events: {
+    label: "События",
+    description:
+      "Календарь событий OrientVentus: деловые форумы, митапы, конференции и мероприятия о бизнесе и технологиях Китая.",
+    keywords: ["события", "мероприятия", "форумы", "конференции", "Китай"],
+  },
+  "upcoming-events": {
+    label: "Ближайшие события",
+    description:
+      "Подборка ближайших мероприятий OrientVentus, которые помогают выстроить деловые связи с Китаем и найти партнёров.",
+    keywords: ["ближайшие события", "деловые встречи", "митапы"],
+  },
+  exhibitions: {
+    label: "Выставки",
+    description:
+      "Гид по ключевым выставкам Китая: форматы участия, тенденции и возможности для компаний из стран СНГ.",
+    keywords: ["выставки", "экспо", "Китай", "деловые поездки"],
+  },
+  translators: {
+    label: "Переводчики",
+    description:
+      "Каталог переводчиков OrientVentus, которые помогают компаниям вести переговоры и работать с китайскими партнёрами.",
+    keywords: ["переводчики", "локализация", "деловые переговоры"],
+  },
+  about: {
+    label: "О проекте",
+    description: SITE_DESCRIPTION,
+    keywords: ["о проекте", SITE_NAME, "миссия"],
+  },
+  contacts: {
+    label: "Контакты",
+    description: "Контакты редакции OrientVentus для обратной связи, сотрудничества и отправки предложений.",
+    keywords: ["контакты", "редакция", "связаться", "OrientVentus"],
+  },
+};
+
+function buildPageSeoMetadata(page: string): SeoMetadata {
+  const staticEntry = STATIC_PAGE_SEO[page];
+
+  if (staticEntry) {
+    const keywords = staticEntry.keywords?.filter((value) => value && value.trim().length > 0);
+
+    return {
+      title: staticEntry.label ? buildPageTitle(staticEntry.label) : DEFAULT_SEO_METADATA.title,
+      description: staticEntry.description || SITE_DESCRIPTION,
+      keywords,
+      section: staticEntry.label,
+    } satisfies SeoMetadata;
+  }
+
+  if (page.startsWith("subsection-")) {
+    const subsectionName = page.replace("subsection-", "").trim();
+
+    return {
+      title: buildPageTitle(subsectionName),
+      description: getSubsectionDescription(subsectionName),
+      keywords: [subsectionName],
+      section: subsectionName,
+    } satisfies SeoMetadata;
+  }
+
+  if (page.startsWith("topic-")) {
+    const topicName = page.replace("topic-", "").trim();
+    const cleanedTopic = topicName.replace(/[-_]+/g, " ").trim();
+
+    return {
+      title: buildPageTitle(`Тема: ${cleanedTopic}`),
+      description: `Подборка материалов по теме «${cleanedTopic}» на ${SITE_NAME}.`,
+      keywords: [cleanedTopic, "тема"],
+      section: cleanedTopic,
+      tags: [cleanedTopic],
+    } satisfies SeoMetadata;
+  }
+
+  return { ...DEFAULT_SEO_METADATA };
 }
 
 const POSTS_PAGE_SIZE = 20;
@@ -1289,6 +1381,37 @@ export default function App() {
     setViewingPost(false);
     setCurrentPostData(null);
   }, [currentPage]);
+
+  useEffect(() => {
+    const currentUrl = typeof window !== "undefined" ? window.location.href : undefined;
+
+    if (viewingPost && currentPostData) {
+      const metadata = buildArticleSeoMetadata({
+        title: currentPostData.title,
+        description: currentPostData.raw?.description ?? currentPostData.excerpt,
+        excerpt: currentPostData.excerpt,
+        image: currentPostData.image ?? currentPostData.raw?.thumbnail ?? undefined,
+        publishedTime: currentPostData.createdAt ?? currentPostData.raw?.createdAt,
+        modifiedTime: currentPostData.updatedAt ?? currentPostData.raw?.updatedAt,
+        author: currentPostData.author,
+        category: currentPostData.category,
+        topic: currentPostData.topic,
+        tags: currentPostData.topic ? [currentPostData.topic] : undefined,
+        url: currentUrl,
+      });
+
+      updateSeoMetadata(metadata);
+      return;
+    }
+
+    const pageMetadata = buildPageSeoMetadata(currentPage);
+
+    updateSeoMetadata({
+      ...pageMetadata,
+      url: currentUrl,
+      canonical: currentUrl,
+    });
+  }, [currentPage, currentPostData, viewingPost]);
 
   const handleViewPost = useCallback(
     (postData?: PostSummary) => {
