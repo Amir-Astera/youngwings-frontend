@@ -846,7 +846,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
             {postData?.title || "Искусственный интеллект меняет мир: главные тренды 2025 года"}
           </h1>
 
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+          <p className="text-sm text-foreground leading-relaxed mb-4">
             {postData?.excerpt ||
               "Эксперты прогнозируют революционные изменения в технологической индустрии. Искусственный интеллект становится основным драйвером инноваций во всех сферах жизни."}
           </p>
@@ -867,7 +867,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
           {postData?.content ? (
             <TipTapContent content={postData.content} className="space-y-4" />
           ) : postData?.excerpt ? (
-            <p className="text-sm text-muted-foreground leading-relaxed">{postData.excerpt}</p>
+            <p className="text-sm text-foreground leading-relaxed">{postData.excerpt}</p>
           ) : null}
         </div>
 
