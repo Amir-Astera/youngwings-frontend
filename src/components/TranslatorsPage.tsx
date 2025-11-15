@@ -6,7 +6,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { Languages, MapPin, Clock, Image as ImageIcon, User, SlidersHorizontal } from "lucide-react";
+import { Languages, MapPin, Clock, QrCode, User, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
@@ -673,7 +673,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                           onClick={() => translator.photoUrl && setSelectedPhoto(translator.photoUrl)}
                           disabled={!translator.photoUrl}
                         >
-                          <ImageIcon className="w-4 h-4" />
+                          <QrCode className="w-4 h-4" />
                           QR
                         </Button>
                         <Button
@@ -760,7 +760,7 @@ export function TranslatorsPage({ onSidebarFiltersChange }: TranslatorsPageProps
                             onClick={() => translator.photoUrl && setSelectedPhoto(translator.photoUrl)}
                             disabled={!translator.photoUrl}
                           >
-                            <ImageIcon className="w-4 h-4" />
+                            <QrCode className="w-4 h-4" />
                             QR
                           </Button>
                           <Button

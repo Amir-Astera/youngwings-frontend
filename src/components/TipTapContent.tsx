@@ -66,15 +66,15 @@ function applyMarks(base: ReactNode, marks: TipTapMark[] | undefined, keyBase: s
   }, base);
 }
 
-function renderNodes(nodes: TipTapNode[] | undefined, keyPrefix: string): ReactNode {
+function renderNodes(nodes: TipTapNode[] | undefined, keyPrefix: string, parentType?: string): ReactNode {
   if (!nodes || nodes.length === 0) {
     return null;
   }
 
-  return nodes.map((node, index) => renderNode(node, `${keyPrefix}-${index}`));
+  return nodes.map((node, index) => renderNode(node, `${keyPrefix}-${index}`, parentType));
 }
 
-function renderNode(node: TipTapNode, key: string): ReactNode {
+function renderNode(node: TipTapNode, key: string, parentType?: string): ReactNode {
   if (!node) {
     return null;
   }
@@ -83,13 +83,25 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
     case "doc":
       return (
         <div key={key} className="space-y-4">
-          {renderNodes(node.content, `${key}-child`)}
+          {renderNodes(node.content, `${key}-child`, node.type)}
         </div>
       );
     case "paragraph": {
-      const children = renderNodes(node.content, `${key}-paragraph`);
+      const children = renderNodes(node.content, `${key}-paragraph`, node.type);
       if (!children) {
+        if (parentType === "listItem") {
+          return <span key={key} className="text-sm text-black dark:text-white leading-relaxed" />;
+        }
+
         return <p key={key} className="text-sm text-black dark:text-white leading-relaxed" />;
+      }
+
+      if (parentType === "listItem") {
+        return (
+          <span key={key} className="text-sm text-black dark:text-white leading-relaxed">
+            {children}
+          </span>
+        );
       }
 
       return (
@@ -113,14 +125,17 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
       const headingClass = sizeClasses[HeadingTag] ?? "text-lg font-semibold";
       return (
         <HeadingTag key={key} className={classNames(headingClass, "text-black dark:text-white")}>
-          {renderNodes(node.content, `${key}-heading`)}
+          {renderNodes(node.content, `${key}-heading`, node.type)}
         </HeadingTag>
       );
     }
     case "bulletList":
       return (
-        <ul key={key} className="list-disc list-inside space-y-2 text-sm text-black dark:text-white">
-          {renderNodes(node.content, `${key}-bullet`)}
+        <ul
+          key={key}
+          className="list-disc pl-5 space-y-2 text-sm text-black dark:text-white [&>li]:marker:text-black [&>li]:dark:marker:text-white"
+        >
+          {renderNodes(node.content, `${key}-bullet`, node.type)}
         </ul>
       );
     case "orderedList": {
@@ -129,21 +144,27 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
         <ol
           key={key}
           start={start}
-          className="list-decimal list-inside space-y-2 text-sm text-black dark:text-white"
+          className="list-decimal pl-5 space-y-2 text-sm text-black dark:text-white [&>li]:marker:text-black [&>li]:dark:marker:text-white"
         >
-          {renderNodes(node.content, `${key}-ordered`)}
+          {renderNodes(node.content, `${key}-ordered`, node.type)}
         </ol>
       );
     }
-    case "listItem":
-      return <li key={key}>{renderNodes(node.content, `${key}-item`)}</li>;
+    case "listItem": {
+      const children = renderNodes(node.content, `${key}-item`, node.type);
+      return (
+        <li key={key} className="text-sm text-black dark:text-white leading-relaxed">
+          {children}
+        </li>
+      );
+    }
     case "blockquote":
       return (
         <blockquote
           key={key}
           className="border-l-4 border-blue-600 bg-gray-50 text-sm text-black dark:text-white leading-relaxed italic rounded-r-lg px-4 py-3 dark:bg-gray-900/40"
         >
-          {renderNodes(node.content, `${key}-blockquote`)}
+          {renderNodes(node.content, `${key}-blockquote`, node.type)}
         </blockquote>
       );
     case "codeBlock": {
@@ -188,7 +209,7 @@ function renderNode(node: TipTapNode, key: string): ReactNode {
       if (node.content) {
         return (
           <div key={key} className="space-y-4">
-            {renderNodes(node.content, `${key}-unknown`)}
+            {renderNodes(node.content, `${key}-unknown`, node.type)}
           </div>
         );
       }
@@ -241,7 +262,7 @@ export function TipTapContent({ content, className }: TipTapContentProps) {
 
     return (
       <div className={classNames("space-y-4", className)}>
-        <p className="text-sm text-muted-foreground leading-relaxed">{parsed}</p>
+        <p className="text-sm text-foreground leading-relaxed">{parsed}</p>
       </div>
     );
   }
