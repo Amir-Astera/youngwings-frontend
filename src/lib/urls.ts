@@ -2,7 +2,11 @@ const rawBasePath = (import.meta.env.BASE_URL ?? "/").trim();
 const sanitizedBasePath = rawBasePath === "/" ? "" : rawBasePath.replace(/\/+$/, "");
 const normalizedBasePath = sanitizedBasePath.startsWith("/") ? sanitizedBasePath : `/${sanitizedBasePath}`;
 const basePath = normalizedBasePath === "/" ? "" : normalizedBasePath;
-const publicSiteUrl = (import.meta.env.VITE_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
+const configuredSiteOrigin = (
+  import.meta.env.VITE_PUBLIC_SITE_ORIGIN ?? import.meta.env.VITE_PUBLIC_SITE_URL ?? "",
+)
+  .trim()
+  .replace(/\/+$/, "");
 
 function ensureLeadingSlash(path: string): string {
   if (!path.startsWith("/")) {
@@ -25,7 +29,7 @@ export function buildPostPath(postId: string): string {
 }
 
 function resolveOrigin(explicitOrigin?: string): string | undefined {
-  const candidate = explicitOrigin?.trim() || publicSiteUrl;
+  const candidate = explicitOrigin?.trim() || configuredSiteOrigin;
 
   if (candidate) {
     return candidate.replace(/\/+$/, "");
@@ -99,6 +103,38 @@ export function buildEventsPath(
   const queryString = params.toString();
 
   return queryString ? `${normalizedBase}?${queryString}` : normalizedBase;
+}
+
+export function getSiteOrigin(): string | undefined {
+  return resolveOrigin();
+}
+
+export function buildAbsoluteUrl(pathOrUrl?: string | null): string | undefined {
+  const candidate = pathOrUrl?.toString().trim();
+
+  if (!candidate) {
+    return undefined;
+  }
+
+  try {
+    if (/^[a-z]+:\/\//i.test(candidate)) {
+      return new URL(candidate).toString();
+    }
+
+    const origin = getSiteOrigin();
+
+    if (origin) {
+      return new URL(candidate, origin).toString();
+    }
+
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return new URL(candidate, window.location.origin).toString();
+    }
+  } catch {
+    return candidate;
+  }
+
+  return candidate;
 }
 
 export function buildEventsUrl(
