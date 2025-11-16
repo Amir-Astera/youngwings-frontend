@@ -840,7 +840,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
             </div>
           </div>
 
-          <h1 className="mb-4 font-bold">
+          <h1 className="mb-4 text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl">
             {postData?.title || "Искусственный интеллект меняет мир: главные тренды 2025 года"}
           </h1>
 

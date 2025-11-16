@@ -196,7 +196,7 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
       {filterContent && filterContent}
 
       {/* Popular Topics */}
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-border rounded-xl p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-blue-100">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm">Популярные темы</h3>
