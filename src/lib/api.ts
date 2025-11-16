@@ -10,8 +10,11 @@ const UPCOMING_EVENTS_ENDPOINT =
   import.meta.env.VITE_API_UPCOMING_EVENTS_ENDPOINT ?? "/api/events/upcoming";
 const TOP_UPCOMING_EVENTS_ENDPOINT =
   import.meta.env.VITE_API_TOP_UPCOMING_EVENTS_ENDPOINT ?? "/api/events/upcoming/top";
+const ADMIN_EVENTS_ENDPOINT = import.meta.env.VITE_API_ADMIN_EVENTS_ENDPOINT ?? "/api/admin/events";
 const TRANSLATOR_VACANCIES_ENDPOINT =
   import.meta.env.VITE_API_TRANSLATOR_VACANCIES_ENDPOINT ?? "/api/translator-vacancies";
+const ADMIN_TRANSLATOR_VACANCIES_ENDPOINT =
+  import.meta.env.VITE_API_ADMIN_TRANSLATOR_VACANCIES_ENDPOINT ?? "/api/admin/translator-vacancies";
 const POSTS_BY_CHAPTER_ENDPOINT =
   import.meta.env.VITE_API_POSTS_BY_CHAPTER_ENDPOINT ?? "/api/posts/by-chapter";
 const POSTS_BY_TOPIC_ENDPOINT =
@@ -179,6 +182,30 @@ async function apiRequest(path: string, init: RequestInit = {}): Promise<Respons
     credentials: "include",
     headers,
   });
+}
+
+async function ensureSuccessfulDelete(response: Response, fallbackMessage: string): Promise<void> {
+  if (response.ok) {
+    return;
+  }
+
+  let message = response.statusText?.trim() || fallbackMessage;
+
+  try {
+    const payload = await parseJsonResponse<{ message?: unknown }>(response);
+
+    if (payload && typeof payload === "object" && "message" in payload) {
+      const extracted = (payload as { message?: unknown }).message;
+
+      if (typeof extracted === "string" && extracted.trim()) {
+        message = extracted.trim();
+      }
+    }
+  } catch (error) {
+    // Ignore JSON parsing issues for error responses without a body
+  }
+
+  throw new Error(message);
 }
 
 interface PaginatedResponse<T> {
@@ -581,6 +608,22 @@ export async function fetchEvents<T>({
   };
 }
 
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  const trimmedId = sanitizeString(eventId);
+
+  if (!trimmedId) {
+    throw new Error("Не удалось определить событие для удаления");
+  }
+
+  const response = await apiRequest(`${ADMIN_EVENTS_ENDPOINT}/${encodeURIComponent(trimmedId)}`, {
+    method: "DELETE",
+  });
+
+  await ensureSuccessfulDelete(response, "Не удалось удалить событие");
+
+  return true;
+}
+
 export async function fetchTopUpcomingEvents<T>({
   size = 3,
   signal,
@@ -842,6 +885,22 @@ export async function fetchTranslatorVacancies<T>({
     size: typeof parsed.size === "number" ? parsed.size : size,
     items: Array.isArray(parsed.items) ? parsed.items : [],
   };
+}
+
+export async function deleteTranslatorVacancy(vacancyId: string): Promise<boolean> {
+  const trimmedId = sanitizeString(vacancyId);
+
+  if (!trimmedId) {
+    throw new Error("Не удалось определить вакансию переводчика для удаления");
+  }
+
+  const response = await apiRequest(`${ADMIN_TRANSLATOR_VACANCIES_ENDPOINT}/${encodeURIComponent(trimmedId)}`, {
+    method: "DELETE",
+  });
+
+  await ensureSuccessfulDelete(response, "Не удалось удалить вакансию переводчика");
+
+  return true;
 }
 
 export async function fetchPostCounters(

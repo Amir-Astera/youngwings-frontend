@@ -834,9 +834,7 @@ export function PostPage({ onBack, postData, onPostUpdate, onPersonalStateUpdate
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm text-gray-900 mb-0.5">OrientVentus</div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{postData?.category || "Технологии"}</span>
-                <span>·</span>
+              <div className="flex items-center text-sm text-muted-foreground">
                 <span>{postData?.date || "15 октября 2025"}</span>
               </div>
             </div>
