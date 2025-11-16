@@ -133,7 +133,7 @@ function renderNode(node: TipTapNode, key: string, parentType?: string): ReactNo
       return (
         <ul
           key={key}
-          className="list-disc pl-5 space-y-2 text-sm text-black dark:text-white [&>li]:marker:text-black [&>li]:dark:marker:text-white"
+          className="list-disc list-inside space-y-2 text-sm text-black dark:text-white [&>li]:marker:text-black [&>li]:dark:marker:text-white"
         >
           {renderNodes(node.content, `${key}-bullet`, node.type)}
         </ul>
@@ -144,7 +144,7 @@ function renderNode(node: TipTapNode, key: string, parentType?: string): ReactNo
         <ol
           key={key}
           start={start}
-          className="list-decimal pl-5 space-y-2 text-sm text-black dark:text-white [&>li]:marker:text-black [&>li]:dark:marker:text-white"
+          className="list-decimal list-inside space-y-2 text-sm text-black dark:text-white [&>li]:marker:text-black [&>li]:dark:marker:text-white"
         >
           {renderNodes(node.content, `${key}-ordered`, node.type)}
         </ol>
@@ -153,7 +153,7 @@ function renderNode(node: TipTapNode, key: string, parentType?: string): ReactNo
     case "listItem": {
       const children = renderNodes(node.content, `${key}-item`, node.type);
       return (
-        <li key={key} className="text-sm text-black dark:text-white leading-relaxed">
+        <li key={key} className="text-sm text-black dark:text-white leading-relaxed pl-1">
           {children}
         </li>
       );

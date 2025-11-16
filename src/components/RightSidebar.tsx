@@ -214,10 +214,12 @@ export function RightSidebar({ onPageChange, currentPage, filterContent }: Right
             <button
               key={topic.name}
               onClick={() => onPageChange(`topic-${topic.name}`)}
-              className="w-full flex items-center justify-between p-2 rounded-lg transition-colors text-left hover:bg-accent/60"
+              className="group w-full flex items-center justify-between p-2 rounded-lg text-left border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm hover:border-blue-100 hover:bg-blue-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:hover:border-blue-400/40 dark:hover:bg-blue-500/10"
             >
-              <span className="text-sm text-muted-foreground ">{topic.name}</span>
-              <span className="text-xs text-muted-foreground bg-blue-600/20 px-2 py-0.5 rounded-full dark:bg-blue-500/30 dark:text-blue-10 0">
+              <span className="text-sm text-muted-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-300">
+                {topic.name}
+              </span>
+              <span className="text-xs text-muted-foreground bg-blue-600/20 px-2 py-0.5 rounded-full transition-all duration-200 group-hover:bg-blue-600 group-hover:text-white group-hover:scale-105 dark:bg-blue-500/30 dark:text-blue-100 dark:group-hover:bg-blue-400 dark:group-hover:text-slate-950">
                 {topic.count}
               </span>
             </button>
