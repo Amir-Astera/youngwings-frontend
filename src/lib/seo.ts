@@ -5,7 +5,7 @@ export const SITE_TAGLINE = "Медиа о бизнесе, стартапах и
 export const SITE_DESCRIPTION =
   "OrientVentus — независимая медиа-платформа, которая рассказывает о бизнесе, стартапах и инновациях в Китае для русскоязычной аудитории.";
 
-const DEFAULT_OG_IMAGE_PATH = "/assets/og-default.jpg";
+const DEFAULT_OG_IMAGE_PATH = "/assets/og-default.png";
 const DEFAULT_PUBLISHER_LOGO_PATH = DEFAULT_OG_IMAGE_PATH;
 
 const DEFAULT_KEYWORDS = [

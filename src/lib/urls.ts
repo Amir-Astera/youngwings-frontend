@@ -3,7 +3,7 @@ const sanitizedBasePath = rawBasePath === "/" ? "" : rawBasePath.replace(/\/+$/,
 const normalizedBasePath = sanitizedBasePath.startsWith("/") ? sanitizedBasePath : `/${sanitizedBasePath}`;
 const basePath = normalizedBasePath === "/" ? "" : normalizedBasePath;
 const configuredSiteOrigin = (
-  import.meta.env.VITE_PUBLIC_SITE_ORIGIN ?? import.meta.env.VITE_PUBLIC_SITE_URL ?? "",
+  "https://orientventus.com/"
 )
   .trim()
   .replace(/\/+$/, "");
