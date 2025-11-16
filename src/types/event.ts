@@ -4,6 +4,7 @@ export interface EventResponse {
   description?: string;
   status?: string;
   eventDate?: string;
+  eventEndDate?: string;
   eventTime?: string;
   location?: string;
   format?: string;
