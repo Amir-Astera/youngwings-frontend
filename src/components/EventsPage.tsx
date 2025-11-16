@@ -560,6 +560,12 @@ export function EventsPage({
     return orderedEvents.map((event) => {
       const coverUrl = getEventCoverUrl(event);
       const eventDate = formatEventDate(event.eventDate);
+      const eventEndDate = formatEventDate(event.eventEndDate);
+      const eventDateDisplay = eventEndDate
+        ? eventDate
+          ? `${eventDate} — ${eventEndDate}`
+          : eventEndDate
+        : eventDate;
       const formatLabel = getEventFormatLabel(event.format);
       const statusLabel = getEventStatusLabel(event.status);
 
@@ -599,10 +605,10 @@ export function EventsPage({
                   </div>
                 )}
 
-                {eventDate && (
+                {eventDateDisplay && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4 text-blue-600" />
-                    <span>{eventDate}</span>
+                    <span>{eventDateDisplay}</span>
                   </div>
                 )}
 
