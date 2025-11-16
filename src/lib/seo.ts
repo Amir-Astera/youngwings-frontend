@@ -1,10 +1,12 @@
-import defaultOgImageUrl from "../assets/news-placeholder.svg";
-import { getBasePath } from "./urls";
+import { buildAbsoluteUrl } from "./urls";
 
 export const SITE_NAME = "OrientVentus";
 export const SITE_TAGLINE = "Медиа о бизнесе, стартапах и инновациях в Китае";
 export const SITE_DESCRIPTION =
   "OrientVentus — независимая медиа-платформа, которая рассказывает о бизнесе, стартапах и инновациях в Китае для русскоязычной аудитории.";
+
+const DEFAULT_OG_IMAGE_PATH = "/assets/og-default.jpg";
+const DEFAULT_PUBLISHER_LOGO_PATH = DEFAULT_OG_IMAGE_PATH;
 
 const DEFAULT_KEYWORDS = [
   "OrientVentus",
@@ -18,6 +20,8 @@ const DEFAULT_KEYWORDS = [
   "рынок Китая",
   "предпринимательство",
 ];
+
+export type StructuredData = Record<string, unknown>;
 
 export interface SeoMetadata {
   title?: string;
@@ -34,6 +38,7 @@ export interface SeoMetadata {
   section?: string;
   tags?: string[];
   author?: string;
+  structuredData?: StructuredData | StructuredData[] | null;
 }
 
 const DEFAULT_SEO_BASE: Required<Pick<SeoMetadata, "title" | "description" | "keywords" | "type" | "image" | "imageAlt" | "robots">> &
@@ -42,7 +47,7 @@ const DEFAULT_SEO_BASE: Required<Pick<SeoMetadata, "title" | "description" | "ke
   description: SITE_DESCRIPTION,
   keywords: DEFAULT_KEYWORDS,
   type: "website",
-  image: defaultOgImageUrl,
+  image: DEFAULT_OG_IMAGE_PATH,
   imageAlt: `${SITE_NAME} — ${SITE_TAGLINE}`,
   robots: "index, follow",
   author: undefined,
@@ -131,15 +136,7 @@ function toAbsoluteUrl(url?: string | null): string | undefined {
     return undefined;
   }
 
-  try {
-    if (typeof window !== "undefined") {
-      return new URL(url, window.location.origin + getBasePath()).toString();
-    }
-
-    return new URL(url, "https://example.com").toString();
-  } catch {
-    return url ?? undefined;
-  }
+  return buildAbsoluteUrl(url);
 }
 
 function normaliseKeywords(keywords?: string[] | string): string[] {
@@ -183,6 +180,34 @@ function formatIsoDate(value?: string): string | undefined {
   return date.toISOString();
 }
 
+function updateStructuredData(data?: StructuredData | StructuredData[] | null): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const existing = document.head.querySelector<HTMLScriptElement>(
+    'script[type="application/ld+json"][data-managed-seo="true"]',
+  );
+
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    existing?.remove();
+    return;
+  }
+
+  const payload = JSON.stringify(data, null, 2);
+
+  if (existing) {
+    existing.textContent = payload;
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.type = "application/ld+json";
+  script.dataset.managedSeo = "true";
+  script.textContent = payload;
+  document.head.appendChild(script);
+}
+
 function clearManagedMeta(selector: string): void {
   document.head
     .querySelectorAll<HTMLMetaElement>(selector)
@@ -209,15 +234,19 @@ export function updateSeoMetadata(overrides: SeoMetadata = {}): SeoMetadata {
   merged.publishedTime = formatIsoDate(merged.publishedTime);
   merged.modifiedTime = formatIsoDate(merged.modifiedTime);
 
+  const resolvedUrl = buildAbsoluteUrl(overrides.url);
+  const resolvedCanonical = buildAbsoluteUrl(overrides.canonical ?? resolvedUrl);
+
   if (typeof window !== "undefined") {
-    merged.url = overrides.url || window.location.href;
-    merged.canonical = overrides.canonical || merged.url;
+    merged.url = resolvedUrl ?? window.location.href;
+    merged.canonical = resolvedCanonical ?? merged.url;
   } else {
-    merged.url = overrides.url;
-    merged.canonical = overrides.canonical || overrides.url;
+    merged.url = resolvedUrl;
+    merged.canonical = resolvedCanonical ?? resolvedUrl;
   }
 
   merged.image = toAbsoluteUrl(merged.image ?? base.image);
+  merged.structuredData = overrides.structuredData;
 
   if (typeof document === "undefined") {
     return merged;
@@ -294,6 +323,7 @@ export function updateSeoMetadata(overrides: SeoMetadata = {}): SeoMetadata {
   }
 
   updateCanonicalLink(merged.canonical);
+  updateStructuredData(merged.structuredData);
 
   return merged;
 }
@@ -312,19 +342,79 @@ export function buildPageTitle(section?: string | null): string {
   return `${cleaned} | ${SITE_NAME}`;
 }
 
-export function buildArticleSeoMetadata(
-  post: Pick<SeoMetadata, "title" | "description" | "image" | "publishedTime" | "modifiedTime" | "author"> & {
-    excerpt?: string;
-    category?: string;
-    topic?: string;
-    tags?: string[];
-    url?: string;
-  },
-): SeoMetadata {
+interface ArticleMetadataInput
+  extends Pick<SeoMetadata, "title" | "description" | "image" | "publishedTime" | "modifiedTime" | "author"> {
+  excerpt?: string;
+  category?: string;
+  topic?: string;
+  tags?: string[];
+  url?: string;
+}
+
+export function buildArticleStructuredData(post: {
+  title: string;
+  description: string;
+  image?: string | null;
+  publishedTime?: string;
+  modifiedTime?: string;
+  author?: string;
+  url?: string;
+}): StructuredData {
+  const absoluteImage = toAbsoluteUrl(post.image ?? DEFAULT_OG_IMAGE_PATH);
+  const datePublished = formatIsoDate(post.publishedTime);
+  const dateModified = formatIsoDate(post.modifiedTime) ?? datePublished;
+  const absoluteUrl = toAbsoluteUrl(post.url);
+  const publisherLogo = toAbsoluteUrl(DEFAULT_PUBLISHER_LOGO_PATH);
+
+  const structuredData: StructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: sanitizeText(post.title) || SITE_NAME,
+    description: truncate(sanitizeText(post.description) || SITE_DESCRIPTION, 200),
+    image: absoluteImage ? [absoluteImage] : undefined,
+    datePublished,
+    dateModified,
+    mainEntityOfPage: absoluteUrl
+      ? {
+          "@type": "WebPage",
+          "@id": absoluteUrl,
+        }
+      : undefined,
+    url: absoluteUrl,
+    author: post.author
+      ? {
+          "@type": "Person",
+          name: sanitizeText(post.author),
+        }
+      : undefined,
+    publisher: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      logo: publisherLogo
+        ? {
+            "@type": "ImageObject",
+            url: publisherLogo,
+          }
+        : undefined,
+    },
+  };
+
+  Object.keys(structuredData).forEach((key) => {
+    const value = structuredData[key as keyof typeof structuredData];
+
+    if (value === undefined || value === null || value === "") {
+      delete structuredData[key as keyof typeof structuredData];
+    }
+  });
+
+  return structuredData;
+}
+
+export function buildArticleSeoMetadata(post: ArticleMetadataInput): SeoMetadata {
   const title = sanitizeText(post.title) || DEFAULT_SEO_BASE.title;
   const description = truncate(
     sanitizeText(post.description || post.excerpt) || DEFAULT_SEO_BASE.description,
-    200,
+    160,
   );
 
   const keywords = normaliseKeywords([
@@ -335,8 +425,12 @@ export function buildArticleSeoMetadata(
     title,
   ]);
 
+  const canonicalUrl = toAbsoluteUrl(post.url);
+  const publishedTime = formatIsoDate(post.publishedTime);
+  const modifiedTime = formatIsoDate(post.modifiedTime) ?? publishedTime;
+
   return {
-    title: buildPageTitle(title),
+    title: `${title} — ${SITE_NAME}`,
     description,
     image: post.image,
     imageAlt: title,
@@ -344,11 +438,20 @@ export function buildArticleSeoMetadata(
     keywords,
     section: post.category,
     tags: Array.isArray(post.tags) ? post.tags : post.topic ? [post.topic] : undefined,
-    publishedTime: post.publishedTime,
-    modifiedTime: post.modifiedTime,
+    publishedTime,
+    modifiedTime,
     author: post.author,
-    url: post.url,
-    canonical: post.url,
+    url: canonicalUrl,
+    canonical: canonicalUrl,
+    structuredData: buildArticleStructuredData({
+      title,
+      description,
+      image: post.image,
+      publishedTime,
+      modifiedTime,
+      author: post.author,
+      url: canonicalUrl,
+    }),
   };
 }
 
