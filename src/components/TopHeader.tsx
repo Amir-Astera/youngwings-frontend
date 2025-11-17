@@ -17,21 +17,24 @@ export function TopHeader({ onPageChange }: TopHeaderProps) {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-white backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-colors">
-      <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: "1440px" }}>
-        <div className="flex h-14 items-center gap-2 sm:gap-4 lg:grid lg:grid-cols-[240px_1fr_340px] lg:gap-10">
+      <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: '1440px' }}>
+        <div 
+  className="flex h-14 items-center gap-2 sm:gap-4"
+  style={{
+    display: window.innerWidth >= 1024 ? 'grid' : 'flex',
+    gridTemplateColumns: window.innerWidth >= 1024 ? '240px 1fr 340px' : undefined,
+    gap: window.innerWidth >= 1024 ? '2.5rem' : undefined
+  }}
+>
           {/* Logo - aligned with left sidebar */}
           <div className="flex-shrink-0">
             <a href="/" className="flex items-center gap-2">
-              <span className="text-lg font-semibold lg:hidden">OrientVentus</span>
+              <span className="text-lg hidden sm:inline">OrientVentus</span>
             </a>
           </div>
 
-          {/* Site name centered between side menus on desktop */}
-          <div className="hidden lg:flex items-center justify-center">
-            <a href="/" className="text-lg font-semibold tracking-tight text-foreground">
-              OrientVentus
-            </a>
-          </div>
+          {/* Empty center space for alignment */}
+          <div className="flex-1"></div>
 
           {/* Action buttons - aligned with right sidebar */}
           <div className="flex justify-end gap-2 flex-shrink-0">
