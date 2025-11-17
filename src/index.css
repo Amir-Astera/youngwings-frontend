@@ -121,6 +121,7 @@
     --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
+    --font-weight-extrabold: 800;
     --leading-relaxed: 1.625;
     --radius-xs: .125rem;
     --ease-out: cubic-bezier(0, 0, .2, 1);
@@ -1556,6 +1557,11 @@
     font-weight: var(--font-weight-semibold);
   }
 
+  .font-extrabold {
+    --tw-font-weight: var(--font-weight-extrabold);
+    font-weight: var(--font-weight-extrabold);
+  }
+
   .text-ellipsis {
     text-overflow: ellipsis;
   }
@@ -2545,6 +2551,7 @@
   --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
+  --font-weight-extrabold: 800;
   --ring: oklch(.708 0 0);
   --chart-1: oklch(.646 .222 41.116);
   --chart-2: oklch(.6 .118 184.704);
@@ -2586,6 +2593,7 @@
   --ring: #4c6fff;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
+  --font-weight-extrabold: 800;
   --chart-1: #3f7fff;
   --chart-2: #4cb5ff;
   --chart-3: #ff9f68;
