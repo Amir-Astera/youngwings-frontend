@@ -1023,6 +1023,7 @@
 
   .items-center {
     align-items: center;
+    justify-items: center
   }
 
   .items-centerr {
