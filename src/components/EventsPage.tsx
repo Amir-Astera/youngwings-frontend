@@ -16,7 +16,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { fetchEvents } from "../lib/api";
-import { formatEventDateRange, getEventCoverUrl, getEventFormatLabel, getEventStatusLabel } from "../lib/events";
+import {
+  formatEventDate,
+  getEventCoverUrl,
+  getEventFormatLabel,
+  getEventStatusLabel,
+} from "../lib/events";
 import type { EventResponse } from "../types/event";
 
 const PAGE_SIZE = 20;
@@ -559,7 +564,8 @@ export function EventsPage({
 
     return orderedEvents.map((event) => {
       const coverUrl = getEventCoverUrl(event);
-      const eventDateDisplay = formatEventDateRange(event.eventDate, event.eventEndDate);
+      const eventStartDate = formatEventDate(event.eventDate);
+      const eventEndDate = formatEventDate(event.eventEndDate);
       const formatLabel = getEventFormatLabel(event.format);
       const statusLabel = getEventStatusLabel(event.status);
 
@@ -599,10 +605,26 @@ export function EventsPage({
                   </div>
                 )}
 
-                {eventDateDisplay && (
+                {(eventStartDate || eventEndDate) && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4 text-blue-600" />
-                    <span>{eventDateDisplay}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      {eventStartDate && (
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Начало:</span>
+                          <span>{eventStartDate}</span>
+                        </span>
+                      )}
+                      {eventStartDate && eventEndDate && (
+                        <span className="text-muted-foreground">•</span>
+                      )}
+                      {eventEndDate && (
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Окончание:</span>
+                          <span>{eventEndDate}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 
