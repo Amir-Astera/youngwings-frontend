@@ -29,7 +29,7 @@ export function TopHeader({ onPageChange }: TopHeaderProps) {
           {/* Logo - aligned with left sidebar */}
           <div className="flex-shrink-0">
             <a href="/" className="flex items-center gap-2">
-              <span className="text-lg hidden sm:inline">OrientVentus</span>
+              <span className="text-base font-semibold sm:text-lg">OrientVentus</span>
             </a>
           </div>
 
