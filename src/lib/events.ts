@@ -1,7 +1,7 @@
 import type { EventResponse } from "../types/event";
 import { resolveFileUrl } from "./api";
 
-export function formatEventDate(value?: string): string {
+export function formatEventDate(value?: string | null): string {
   if (!value) {
     return "";
   }
@@ -17,6 +17,17 @@ export function formatEventDate(value?: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+export function formatEventDateRange(start?: string | null, end?: string | null): string {
+  const formattedStart = formatEventDate(start);
+  const formattedEnd = formatEventDate(end);
+
+  if (formattedStart && formattedEnd) {
+    return `${formattedStart} — ${formattedEnd}`;
+  }
+
+  return formattedStart || formattedEnd;
 }
 
 export function formatEventTime(value?: string): string {
