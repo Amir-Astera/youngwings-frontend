@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { toast } from "sonner";
 
 import { buildEventShareUrl, fetchEvents } from "../lib/api";
-import { formatEventDate, getEventCoverUrl, getEventFormatLabel } from "../lib/events";
+import { formatEventDateRange, getEventCoverUrl, getEventFormatLabel } from "../lib/events";
 import type { EventResponse } from "../types/event";
 
 function getEventStatus(eventDate?: string): "upcoming" | "completed" {
@@ -271,7 +271,8 @@ export function ExhibitionsPage() {
             const description = event.description?.trim();
             const location = event.location?.trim();
             const registrationUrl = event.registrationUrl?.trim();
-            const dateLabel = formatEventDate(event.eventDate) || "Дата уточняется";
+            const dateLabel =
+              formatEventDateRange(event.eventDate, event.eventEndDate) || "Дата уточняется";
             const coverUrl = getEventCoverUrl(event);
             const formatLabel = getEventFormatLabel(event.format);
             const shareUrl = buildEventShareUrl(event.id);
