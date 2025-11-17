@@ -1025,6 +1025,10 @@
     align-items: center;
   }
 
+  .items-centerr {
+    justify-items: center;
+  }
+
   .items-start {
     align-items: flex-start;
   }
