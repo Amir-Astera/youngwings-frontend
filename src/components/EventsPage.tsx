@@ -16,7 +16,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { fetchEvents } from "../lib/api";
-import { formatEventDate, getEventCoverUrl, getEventFormatLabel, getEventStatusLabel } from "../lib/events";
+import { formatEventDateRange, getEventCoverUrl, getEventFormatLabel, getEventStatusLabel } from "../lib/events";
 import type { EventResponse } from "../types/event";
 
 const PAGE_SIZE = 20;
@@ -559,13 +559,7 @@ export function EventsPage({
 
     return orderedEvents.map((event) => {
       const coverUrl = getEventCoverUrl(event);
-      const eventDate = formatEventDate(event.eventDate);
-      const eventEndDate = formatEventDate(event.eventEndDate);
-      const eventDateDisplay = eventEndDate
-        ? eventDate
-          ? `${eventDate} — ${eventEndDate}`
-          : eventEndDate
-        : eventDate;
+      const eventDateDisplay = formatEventDateRange(event.eventDate, event.eventEndDate);
       const formatLabel = getEventFormatLabel(event.format);
       const statusLabel = getEventStatusLabel(event.status);
 
